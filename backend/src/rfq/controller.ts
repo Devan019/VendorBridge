@@ -3,6 +3,7 @@ import { RFQStatus } from '../generated/prisma/enums';
 import prisma from '../lib/prisma';
 import fs from 'fs';
 import path from 'path';
+import { logActivity } from '../utils/activityLog';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -196,6 +197,8 @@ export async function createRFQ(req: Request, res: Response): Promise<void> {
       },
     });
 
+    await logActivity('RFQ', rfq.id, 'CREATED', rfq.created_by);
+
     res.status(201).json({ data: rfq });
   } catch (err: unknown) {
     if ((err as { code?: string }).code === 'P2002') {
@@ -260,6 +263,7 @@ export async function updateRFQ(req: Request, res: Response): Promise<void> {
     if (deadline    !== undefined) data.deadline    = new Date(deadline);
 
     const updated = await prisma.rFQ.update({ where: { id }, data });
+    await logActivity('RFQ', updated.id, 'UPDATED', req.user?.id || existing.created_by);
     res.json({ data: updated });
   } catch (err) {
     console.error('[updateRFQ]', err);
@@ -293,6 +297,7 @@ export async function updateRFQStatus(req: Request, res: Response): Promise<void
     }
 
     const updated = await prisma.rFQ.update({ where: { id }, data: { status: newStatus } });
+    await logActivity('RFQ', updated.id, `STATUS_CHANGED:${newStatus}`, req.user?.id || existing.created_by);
     res.json({ data: updated });
   } catch (err) {
     console.error('[updateRFQStatus]', err);
@@ -323,6 +328,7 @@ export async function deleteRFQ(req: Request, res: Response): Promise<void> {
     }
 
     await prisma.rFQ.delete({ where: { id } });
+    await logActivity('RFQ', id, 'DELETED', req.user?.id || existing.created_by);
     res.json({ message: 'RFQ deleted.' });
   } catch (err) {
     console.error('[deleteRFQ]', err);

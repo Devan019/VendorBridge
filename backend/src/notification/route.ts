@@ -5,9 +5,12 @@ import {
   markAllAsRead,
   deleteNotification,
   clearReadNotifications,
+  listLogs,
+  exportLogs,
 } from "./controller";
 
 const router = Router();
+const logRouter = Router();
 
 // GET    /api/notifications              ?user_id, type, read, entity_type, page, limit
 // PATCH  /api/notifications/read-all     mark all read for a user
@@ -22,4 +25,9 @@ router.delete("/", clearReadNotifications);
 router.patch("/:id/read", markAsRead);
 router.delete("/:id", deleteNotification);
 
-export default router;
+// ── Activity Logs Routes ──────────────────────────────────────────────────────
+
+logRouter.get("/", listLogs);
+logRouter.get("/export", exportLogs);
+
+export { router as default, logRouter };

@@ -42,3 +42,12 @@ export const isAuthenticated = expressAsyncHandler(async (req: Request, res: Res
     return formatResponse(res, 401, "Access token invalid or expired", false, null);
   }
 });
+
+export const isAuthorized = (allowedRoles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return formatResponse(res, 403, "Forbidden: Insufficient permissions", false, null);
+    }
+    next();
+  };
+};

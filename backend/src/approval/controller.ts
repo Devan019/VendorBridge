@@ -3,6 +3,8 @@ import expressAsyncHandler from "../utils/expressAsync";
 import { formatResponse } from "../utils/formateResponse";
 import { ApprovalStatus, QuotationStatus } from "../generated/prisma/enums";
 import prisma from "../lib/prisma";
+import { generatePO } from "../po/service";
+import { logActivity } from "../utils/activityLog";
 import {
   createApprovalSchema,
   decideApprovalSchema,
@@ -136,6 +138,8 @@ export const createApproval = expressAsyncHandler(
       "Approval",
       approval.id,
     );
+
+    await logActivity("Approval", approval.id, "CREATED", req.user?.id || approver_id);
 
     return formatResponse(res, 201, "Approval request created", true, approval);
   },
@@ -281,7 +285,16 @@ export const approveApproval = expressAsyncHandler(
         "Quotation",
         existing.quotation_id,
       );
+
+      // Auto-generate PO
+      try {
+        await generatePO(existing.quotation_id, existing.quotation.rfq.created_by);
+      } catch (err: any) {
+        console.error("Failed to auto-generate PO:", err);
+      }
     }
+
+    await logActivity("Approval", id, "APPROVED", req.user?.id || existing.approver_id);
 
     return formatResponse(res, 200, "Approval approved", true, updated);
   },
@@ -351,6 +364,8 @@ export const rejectApproval = expressAsyncHandler(
       "Quotation",
       existing.quotation_id,
     );
+
+    await logActivity("Approval", id, "REJECTED", req.user?.id || existing.approver_id);
 
     const updated = await prisma.approval.findUnique({ where: { id } });
     return formatResponse(res, 200, "Approval rejected", true, updated);
@@ -423,6 +438,8 @@ export const escalateApproval = expressAsyncHandler(
       "Approval",
       nextApproval.id,
     );
+
+    await logActivity("Approval", id, "ESCALATED", req.user?.id || existing.approver_id);
 
     return formatResponse(res, 200, "Approval escalated", true, { escalated, next_approval: nextApproval });
   },

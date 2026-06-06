@@ -43,6 +43,22 @@ enum ApprovalStatus {
   ESCALATED
 }
 
+enum POStatus {
+  DRAFT
+  ISSUED
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -185,23 +201,56 @@ model Approval {
 
 model PurchaseOrder {
   id           String    @id @default(uuid())
+  po_number    String    @unique           // auto-generated: PO-YYYYMMDD-XXXX
   rfq_id       String
   quotation_id String
-  po_number    String    @unique
-  status       String
+  vendor_id    String                      // denormalized for fast lookup
+  created_by   String                      // user who created the PO
+  status       POStatus  @default(DRAFT)
+  gst_rate     Decimal   @default(18)      // GST % applied to all items
+  subtotal     Decimal   @default(0)       // sum of unit_price × quantity
+  tax_amount   Decimal   @default(0)       // subtotal × gst_rate / 100
+  grand_total  Decimal   @default(0)       // subtotal + tax_amount
+  notes        String?
+  terms        String?                     // payment terms e.g. "Net 30"
+  issued_at    DateTime?                   // set when status → ISSUED
   created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  items        PO_Item[]
   invoices     Invoice[]
   quotation    Quotation @relation(fields: [quotation_id], references: [id])
   rfq          RFQ       @relation(fields: [rfq_id], references: [id])
 }
 
+model PO_Item {
+  id           String        @id @default(uuid())
+  po_id        String
+  po           PurchaseOrder @relation(fields: [po_id], references: [id], onDelete: Cascade)
+  product_name String
+  description  String?
+  quantity     Int
+  unit         String
+  unit_price   Decimal
+  gst_rate     Decimal       @default(18)  // item-level rate (can differ from PO)
+  tax_amount   Decimal       @default(0)
+  total        Decimal       @default(0)   // (unit_price × quantity) + tax_amount
+}
+
 model Invoice {
   id             String        @id @default(uuid())
+  invoice_number String        @unique       // auto-generated: INV-YYYYMMDD-XXXX
   po_id          String
-  invoice_number String        @unique
-  tax_amount     Decimal
-  total          Decimal
-  status         String
+  status         InvoiceStatus @default(DRAFT)
+  invoice_date   DateTime      @default(now())
+  due_date       DateTime?                   // set on creation, e.g. +30 days
+  subtotal       Decimal       @default(0)
+  tax_amount     Decimal       @default(0)
+  grand_total    Decimal       @default(0)
+  notes          String?
+  paid_at        DateTime?                   // set when status → PAID
+  email_sent_at  DateTime?                   // set when invoice emailed to vendor
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
   po             PurchaseOrder @relation(fields: [po_id], references: [id])
 }
 
