@@ -4,9 +4,30 @@ import cors from 'cors';
 import express, { Application, Request, Response } from 'express';
 import vendorRoutes from './routes/vendor.routes';
 import rfqRoutes from './routes/rfq.routes';
+import authRoutes from './auth/route';
 
 const app: Application = express();
 const PORT: number = Number(process.env.PORT) || 4000;
+
+app.use((req, _res, next) => {
+  const cookies: Record<string, string> = {};
+  const cookieHeader = req.headers.cookie;
+
+  if (cookieHeader) {
+    cookieHeader.split(';').forEach((part) => {
+      const [rawKey, ...rawValue] = part.trim().split('=');
+
+      if (!rawKey) {
+        return;
+      }
+
+      cookies[decodeURIComponent(rawKey)] = decodeURIComponent(rawValue.join('='));
+    });
+  }
+
+  req.cookies = cookies;
+  next();
+});
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(
@@ -14,6 +35,7 @@ app.use(
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
   }),
 );
 app.use(express.json());
@@ -30,6 +52,7 @@ app.get('/', (_req: Request, res: Response) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/rfqs', rfqRoutes);
 

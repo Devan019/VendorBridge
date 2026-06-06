@@ -7,18 +7,24 @@ import { ACCESS_KEY } from "./env_var";
 declare global {
   namespace Express {
     interface Request {
+      cookies: Record<string, string>;
       user: {
         id: string;
+        first_name: string;
+        last_name: string;
         name: string;
         email: string;
         role: string;
+        phone?: string | null;
+        country?: string | null;
+        image_url?: string | null;
       }
     }
   }
 }
 
 
-export const isAuthenticated = expressAsyncHandler(async(req: Request, res: Response, next: NextFunction) => {
+export const isAuthenticated = expressAsyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const { access_token } = req.cookies;
 
   // 1. No token? 401 Unauthorized
