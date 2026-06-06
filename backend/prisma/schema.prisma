@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -7,66 +10,114 @@ datasource db {
   provider = "postgresql"
 }
 
+enum VendorStatus {
+  ACTIVE
+  INACTIVE
+  BLACKLISTED
+}
+
+enum RFQStatus {
+  DRAFT
+  SENT
+  CLOSED
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  PROCUREMENT_OFFICER
+  VENDOR
+}
+
 model User {
-  id            String         @id @default(uuid())
-  name          String
-  email         String         @unique
-  password_hash String
-  role          String
-  created_at    DateTime       @default(now())
-  logs          ActivityLog[]
-  approvals     Approval[]
-  notifications Notification[]
-  rfqs          RFQ[]          @relation("CreatedBy")
-  VendorNote    VendorNote[]
+  id             String         @id @default(uuid())
+  first_name           String
+  last_name            String
+  email          String         @unique
+  password_hash  String
+  role           UserRole
+  phone          String?
+  country        String?
+  image_url      String?
+  created_at     DateTime       @default(now())
+  logs           ActivityLog[]
+  approvals      Approval[]
+  notifications  Notification[]
+  rfqs           RFQ[]          @relation("CreatedBy")
   refresh_tokens RefreshToken[]
+  vendorNotes    VendorNote[]
 }
 
 model Vendor {
   id            String       @id @default(uuid())
   name          String
   category      String
+  tags          String[]     @default([])
   gst_number    String       @unique
   contact_email String
   address       String?
   created_at    DateTime     @default(now())
   phone         String?
-  tags          String[]     @default([])
   updated_at    DateTime
   status        VendorStatus @default(ACTIVE)
   quotations    Quotation[]
   rfqs          RFQ_Vendor[]
-  VendorNote    VendorNote[]
+  vendorNotes   VendorNote[]
+}
+
+model VendorNote {
+  id         String   @id @default(uuid())
+  vendor_id  String
+  vendor     Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+  author_id  String?
+  author     User?    @relation(fields: [author_id], references: [id])
+  content    String
+  created_at DateTime @default(now())
 }
 
 model RFQ {
-  id          String          @id @default(uuid())
-  title       String
-  description String
-  deadline    DateTime
-  status      String
-  created_by  String
-  pos         PurchaseOrder[]
-  quotations  Quotation[]
-  creator     User            @relation("CreatedBy", fields: [created_by], references: [id])
-  items       RFQ_Item[]
-  vendors     RFQ_Vendor[]
+  id             String           @id @default(uuid())
+  title          String
+  description    String
+  deadline       DateTime
+  status         String
+  created_by     String
+  pos            PurchaseOrder[]
+  quotations     Quotation[]
+  creator        User             @relation("CreatedBy", fields: [created_by], references: [id])
+  items          RFQ_Item[]
+  vendors        RFQ_Vendor[]
+  rfqAttachments RFQ_Attachment[]
 }
 
 model RFQ_Item {
   id           String           @id @default(uuid())
   rfq_id       String
+  rfq          RFQ              @relation(fields: [rfq_id], references: [id], onDelete: Cascade)
   product_name String
+  description  String?
   quantity     Int
   unit         String
+  unit_price   Decimal?
   q_items      Quotation_Item[]
-  rfq          RFQ              @relation(fields: [rfq_id], references: [id])
+}
+
+model RFQ_Attachment {
+  id            String   @id @default(uuid())
+  rfq_id        String
+  rfq           RFQ      @relation(fields: [rfq_id], references: [id], onDelete: Cascade)
+  filename      String
+  original_name String
+  mime_type     String
+  size_bytes    Int
+  path          String
+  uploaded_at   DateTime @default(now())
 }
 
 model RFQ_Vendor {
   rfq_id    String
   vendor_id String
-  rfq       RFQ    @relation(fields: [rfq_id], references: [id])
+  rfq       RFQ    @relation(fields: [rfq_id], references: [id], onDelete: Cascade)
   vendor    Vendor @relation(fields: [vendor_id], references: [id])
 
   @@id([rfq_id, vendor_id])
@@ -134,8 +185,8 @@ model ActivityLog {
   entity_id    String
   action       String
   performed_by String
-  timestamp    DateTime @default(now())
   user         User     @relation(fields: [performed_by], references: [id])
+  timestamp    DateTime @default(now())
 }
 
 model Notification {
@@ -146,23 +197,6 @@ model Notification {
   created_at DateTime @default(now())
   user       User     @relation(fields: [user_id], references: [id])
 }
-
-model VendorNote {
-  id         String   @id
-  vendor_id  String
-  author_id  String?
-  content    String
-  created_at DateTime @default(now())
-  User       User?    @relation(fields: [author_id], references: [id])
-  Vendor     Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
-}
-
-enum VendorStatus {
-  ACTIVE
-  INACTIVE
-  BLACKLISTED
-}
-
 
 model RefreshToken {
   id         String   @id @default(uuid())
