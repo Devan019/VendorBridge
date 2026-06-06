@@ -4,6 +4,8 @@ import prisma from '../utils/prisma';
 import { logActivity } from '../utils/activityLog';
 import { uploadBufferToS3, deleteFileFromS3 } from '../utils/s3';
 import { S3_PUBLIC_BUCKET } from '../env_var';
+import expressAsyncHandler from '../utils/expressAsync';
+import { formatResponse } from '../utils/formateResponse';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,131 +45,120 @@ const TRANSITIONS: Record<RFQStatus, RFQStatus[]> = {
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
 
-/**
- * GET /api/rfqs
- * ?search, status, created_by, sortBy, order, page, limit
- */
-export async function listRFQs(req: Request, res: Response): Promise<void> {
-  try {
-    const search = qs(req.query.search);
-    const status = qs(req.query.status);
-    const created_by = qs(req.query.created_by);
-    const sortBy = qs(req.query.sortBy, 'created_at');
-    const order = qs(req.query.order, 'desc');
-    const page = qs(req.query.page, '1');
-    const limit = qs(req.query.limit, '20');
+export const listRFQs = expressAsyncHandler(async (req: Request, res: Response) => {
+  const search = qs(req.query.search);
+  const status = qs(req.query.status);
+  const created_by = qs(req.query.created_by);
+  const sortBy = qs(req.query.sortBy, 'created_at');
+  const order = qs(req.query.order, 'desc');
+  const page = qs(req.query.page, '1');
+  const limit = qs(req.query.limit, '20');
 
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
-    const skip = (pageNum - 1) * limitNum;
+  const pageNum = Math.max(1, parseInt(page, 10));
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+  const skip = (pageNum - 1) * limitNum;
 
-    const allowed = { title: 1, status: 1, deadline: 1, created_at: 1, reference_number: 1 };
-    const sortField = (allowed as Record<string, number>)[sortBy] ? sortBy : 'created_at';
-    const sortOrder = order === 'asc' ? 'asc' : 'desc';
+  const allowed = { title: 1, status: 1, deadline: 1, created_at: 1, reference_number: 1 };
+  const sortField = (allowed as Record<string, number>)[sortBy] ? sortBy : 'created_at';
+  const sortOrder = order === 'asc' ? 'asc' : 'desc';
 
-    const where: Record<string, unknown> = {};
-    if (search.trim()) {
-      where.OR = [
-        { title: { contains: search.trim(), mode: 'insensitive' } },
-        { reference_number: { contains: search.trim(), mode: 'insensitive' } },
-        { description: { contains: search.trim(), mode: 'insensitive' } },
-      ];
-    }
-    if (status) {
-      const parsed = parseRFQStatus(status);
-      if (parsed) where.status = parsed;
-    }
-    if (created_by) where.created_by = created_by;
-
-    const [rfqs, total] = await Promise.all([
-      prisma.rFQ.findMany({
-        where,
-        orderBy: { [sortField]: sortOrder },
-        skip,
-        take: limitNum,
-        select: {
-          id: true, reference_number: true, title: true, description: true,
-          deadline: true, status: true, created_at: true, updated_at: true,
-          creator: { select: { id: true, name: true, email: true } },
-          _count: { select: { items: true, vendors: true, rfqAttachments: true, quotations: true } },
-        },
-      }),
-      prisma.rFQ.count({ where }),
-    ]);
-
-    const [draftCount, sentCount, closedCount] = await Promise.all([
-      prisma.rFQ.count({ where: { status: 'DRAFT' } }),
-      prisma.rFQ.count({ where: { status: 'SENT' } }),
-      prisma.rFQ.count({ where: { status: 'CLOSED' } }),
-    ]);
-
-    res.json({
-      data: rfqs,
-      pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) },
-      stats: { total: draftCount + sentCount + closedCount, draft: draftCount, sent: sentCount, closed: closedCount },
-    });
-  } catch (err) {
-    console.error('[listRFQs]', err);
-    res.status(500).json({ error: 'Failed to fetch RFQs.' });
+  const where: Record<string, unknown> = {};
+  if (search.trim()) {
+    where.OR = [
+      { title: { contains: search.trim(), mode: 'insensitive' } },
+      { reference_number: { contains: search.trim(), mode: 'insensitive' } },
+      { description: { contains: search.trim(), mode: 'insensitive' } },
+    ];
   }
-}
+  if (status) {
+    const parsed = parseRFQStatus(status);
+    if (parsed) where.status = parsed;
+  }
+  if (created_by) where.created_by = created_by;
 
-/**
- * POST /api/rfqs
- * Body: { title, description, deadline, created_by, items[], vendor_ids[] }
- * items: [{ product_name, description?, quantity, unit, unit_price? }]
- */
-export async function createRFQ(req: Request, res: Response): Promise<void> {
-  try {
-    const { title, description, deadline, created_by, items, vendor_ids, status } = req.body as {
-      title?: string;
+  const [rfqs, total] = await Promise.all([
+    prisma.rFQ.findMany({
+      where,
+      orderBy: { [sortField]: sortOrder },
+      skip,
+      take: limitNum,
+      select: {
+        id: true, reference_number: true, title: true, description: true,
+        deadline: true, status: true, created_at: true, updated_at: true,
+        creator: { select: { id: true, name: true, email: true } },
+        _count: { select: { items: true, vendors: true, rfqAttachments: true, quotations: true } },
+      },
+    }),
+    prisma.rFQ.count({ where }),
+  ]);
+
+  const [draftCount, sentCount, closedCount] = await Promise.all([
+    prisma.rFQ.count({ where: { status: 'DRAFT' } }),
+    prisma.rFQ.count({ where: { status: 'SENT' } }),
+    prisma.rFQ.count({ where: { status: 'CLOSED' } }),
+  ]);
+
+  const payload = {
+    data: rfqs,
+    pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) },
+    stats: { total: draftCount + sentCount + closedCount, draft: draftCount, sent: sentCount, closed: closedCount },
+  };
+
+  return formatResponse(res, 200, "RFQs fetched successfully", true, payload);
+});
+
+export const createRFQ = expressAsyncHandler(async (req: Request, res: Response) => {
+  const { title, description, deadline, created_by, items, vendor_ids, status } = req.body as {
+    title?: string;
+    description?: string;
+    deadline?: string;
+    created_by?: string;
+    items?: Array<{
+      product_name?: string;
       description?: string;
-      deadline?: string;
-      created_by?: string;
-      items?: Array<{
-        product_name?: string;
-        description?: string;
-        quantity?: number;
-        unit?: string;
-        unit_price?: number;
-      }>;
-      vendor_ids?: string[];
-      status?: string;
-    };
+      quantity?: number;
+      unit?: string;
+      unit_price?: number;
+    }>;
+    vendor_ids?: string[];
+    status?: string;
+  };
 
-    // Validation
-    const errors: string[] = [];
-    if (!title?.trim()) errors.push('title is required.');
-    if (!description?.trim()) errors.push('description is required.');
-    if (!deadline) errors.push('deadline is required.');
-    else if (isNaN(Date.parse(deadline))) errors.push('deadline must be a valid date.');
-    if (!created_by?.trim()) errors.push('created_by (user id) is required.');
+  const errors: string[] = [];
+  if (!title?.trim()) errors.push('title is required.');
+  if (!description?.trim()) errors.push('description is required.');
+  if (!deadline) errors.push('deadline is required.');
+  else if (isNaN(Date.parse(deadline))) errors.push('deadline must be a valid date.');
+  if (!created_by?.trim()) errors.push('created_by (user id) is required.');
 
-    if (Array.isArray(items) && items.length > 0) {
-      items.forEach((item, i) => {
-        if (!item.product_name?.trim()) errors.push(`items[${i}].product_name is required.`);
-        if (!item.quantity || item.quantity < 1) errors.push(`items[${i}].quantity must be >= 1.`);
-        if (!item.unit?.trim()) errors.push(`items[${i}].unit is required.`);
-      });
+  if (Array.isArray(items) && items.length > 0) {
+    items.forEach((item, i) => {
+      if (!item.product_name?.trim()) errors.push(`items[${i}].product_name is required.`);
+      if (!item.quantity || item.quantity < 1) errors.push(`items[${i}].quantity must be >= 1.`);
+      if (!item.unit?.trim()) errors.push(`items[${i}].unit is required.`);
+    });
+  }
+
+  if (errors.length > 0) {
+    return formatResponse(res, 400, "Validation Error", false, null, errors);
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: created_by! }, select: { id: true } });
+  if (!user) {
+    return formatResponse(res, 404, "Not Found", false, null, "creator user not found.");
+  }
+
+  if (Array.isArray(vendor_ids) && vendor_ids.length > 0) {
+    const found = await prisma.vendor.count({ where: { id: { in: vendor_ids } } });
+    if (found !== vendor_ids.length) {
+      return formatResponse(res, 404, "Not Found", false, null, "One or more vendor_ids not found.");
     }
+  }
 
-    if (errors.length > 0) { res.status(400).json({ errors }); return; }
+  const reference_number = await generateRefNumber();
+  const parsedStatus = parseRFQStatus(status) ?? RFQStatus.DRAFT;
 
-    // Verify creator exists
-    const user = await prisma.user.findUnique({ where: { id: created_by! }, select: { id: true } });
-    if (!user) { res.status(404).json({ error: 'creator user not found.' }); return; }
-
-    // Verify vendor IDs
-    if (Array.isArray(vendor_ids) && vendor_ids.length > 0) {
-      const found = await prisma.vendor.count({ where: { id: { in: vendor_ids } } });
-      if (found !== vendor_ids.length) {
-        res.status(404).json({ error: 'One or more vendor_ids not found.' }); return;
-      }
-    }
-
-    const reference_number = await generateRefNumber();
-    const parsedStatus = parseRFQStatus(status) ?? RFQStatus.DRAFT;
-
+  try {
     const rfq = await prisma.rFQ.create({
       data: {
         reference_number,
@@ -199,377 +190,322 @@ export async function createRFQ(req: Request, res: Response): Promise<void> {
 
     await logActivity('RFQ', rfq.id, 'CREATED', rfq.created_by);
 
-    res.status(201).json({ data: rfq });
-  } catch (err: unknown) {
-    if ((err as { code?: string }).code === 'P2002') {
-      res.status(409).json({ error: 'Reference number conflict — please retry.' }); return;
+    return formatResponse(res, 201, "RFQ created successfully", true, { data: rfq });
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      return formatResponse(res, 409, "Conflict", false, null, "Reference number conflict — please retry.");
     }
-    console.error('[createRFQ]', err);
-    res.status(500).json({ error: 'Failed to create RFQ.' });
+    throw err;
   }
-}
+});
 
-/**
- * GET /api/rfqs/:id
- */
-export async function getRFQ(req: Request, res: Response): Promise<void> {
-  try {
-    const id = String(req.params['id']);
+export const getRFQ = expressAsyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params['id']);
 
-    const rfq = await prisma.rFQ.findUnique({
-      where: { id },
-      include: {
-        items: true,
-        rfqAttachments: true,
-        vendors: { include: { vendor: { select: { id: true, name: true, category: true, gst_number: true, contact_email: true, status: true } } } },
-        creator: { select: { id: true, name: true, email: true } },
-        _count: { select: { quotations: true } },
-      },
-    });
+  const rfq = await prisma.rFQ.findUnique({
+    where: { id },
+    include: {
+      items: true,
+      rfqAttachments: true,
+      vendors: { include: { vendor: { select: { id: true, name: true, category: true, gst_number: true, contact_email: true, status: true } } } },
+      creator: { select: { id: true, name: true, email: true } },
+      _count: { select: { quotations: true } },
+    },
+  });
 
-    if (!rfq) { res.status(404).json({ error: 'RFQ not found.' }); return; }
-    res.json({ data: rfq });
-  } catch (err) {
-    console.error('[getRFQ]', err);
-    res.status(500).json({ error: 'Failed to fetch RFQ.' });
+  if (!rfq) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
   }
-}
+  return formatResponse(res, 200, "RFQ fetched successfully", true, { data: rfq });
+});
 
-/**
- * PATCH /api/rfqs/:id
- * Updates editable fields — only allowed when status = DRAFT
- */
-export async function updateRFQ(req: Request, res: Response): Promise<void> {
-  try {
-    const id = String(req.params['id']);
-    const { title, description, deadline } = req.body as {
-      title?: string; description?: string; deadline?: string;
-    };
+export const updateRFQ = expressAsyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params['id']);
+  const { title, description, deadline } = req.body as {
+    title?: string; description?: string; deadline?: string;
+  };
 
-    const existing = await prisma.rFQ.findUnique({ where: { id } });
-    if (!existing) { res.status(404).json({ error: 'RFQ not found.' }); return; }
-    if (existing.status !== 'DRAFT') {
-      res.status(409).json({ error: 'Only DRAFT RFQs can be edited.' }); return;
-    }
-
-    const errors: string[] = [];
-    if (deadline !== undefined && isNaN(Date.parse(deadline)))
-      errors.push('deadline must be a valid date.');
-    if (errors.length > 0) { res.status(400).json({ errors }); return; }
-
-    const data: Record<string, unknown> = {};
-    if (title !== undefined) data.title = title.trim();
-    if (description !== undefined) data.description = description.trim();
-    if (deadline !== undefined) data.deadline = new Date(deadline);
-
-    const updated = await prisma.rFQ.update({ where: { id }, data });
-    await logActivity('RFQ', updated.id, 'UPDATED', req.user?.id || existing.created_by);
-    res.json({ data: updated });
-  } catch (err) {
-    console.error('[updateRFQ]', err);
-    res.status(500).json({ error: 'Failed to update RFQ.' });
+  const existing = await prisma.rFQ.findUnique({ where: { id } });
+  if (!existing) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
   }
-}
-
-/**
- * PATCH /api/rfqs/:id/status
- * Body: { status: "SENT" | "CLOSED" }
- * Enforces valid transitions: DRAFT→SENT, SENT→CLOSED
- */
-export async function updateRFQStatus(req: Request, res: Response): Promise<void> {
-  try {
-    const id = String(req.params['id']);
-    const { status } = req.body as { status?: string };
-
-    if (!status) { res.status(400).json({ error: 'status is required.' }); return; }
-    const newStatus = parseRFQStatus(status);
-    if (!newStatus) { res.status(400).json({ error: 'status must be DRAFT, SENT, or CLOSED.' }); return; }
-
-    const existing = await prisma.rFQ.findUnique({ where: { id } });
-    if (!existing) { res.status(404).json({ error: 'RFQ not found.' }); return; }
-
-    const allowed = TRANSITIONS[existing.status as RFQStatus];
-    if (!allowed.includes(newStatus)) {
-      res.status(409).json({
-        error: `Cannot transition from ${existing.status} to ${newStatus}. Allowed: ${allowed.join(', ') || 'none'}.`,
-      });
-      return;
-    }
-
-    const updated = await prisma.rFQ.update({ where: { id }, data: { status: newStatus } });
-    await logActivity('RFQ', updated.id, `STATUS_CHANGED:${newStatus}`, req.user?.id || existing.created_by);
-    res.json({ data: updated });
-  } catch (err) {
-    console.error('[updateRFQStatus]', err);
-    res.status(500).json({ error: 'Failed to update RFQ status.' });
+  if (existing.status !== 'DRAFT') {
+    return formatResponse(res, 409, "Conflict", false, null, "Only DRAFT RFQs can be edited.");
   }
-}
 
-/**
- * DELETE /api/rfqs/:id
- * Hard delete — only DRAFT RFQs can be deleted
- */
-export async function deleteRFQ(req: Request, res: Response): Promise<void> {
-  try {
-    const id = String(req.params['id']);
-
-    const existing = await prisma.rFQ.findUnique({
-      where: { id },
-      include: { rfqAttachments: { select: { path: true } } },
-    });
-    if (!existing) { res.status(404).json({ error: 'RFQ not found.' }); return; }
-    if (existing.status !== 'DRAFT') {
-      res.status(409).json({ error: 'Only DRAFT RFQs can be deleted.' }); return;
-    }
-
-    for (const att of existing.rfqAttachments) {
-      await deleteFileFromS3(att.path, S3_PUBLIC_BUCKET || 'public');
-    }
-
-    await prisma.rFQ.delete({ where: { id } });
-    await logActivity('RFQ', id, 'DELETED', req.user?.id || existing.created_by);
-    res.json({ message: 'RFQ deleted.' });
-  } catch (err) {
-    console.error('[deleteRFQ]', err);
-    res.status(500).json({ error: 'Failed to delete RFQ.' });
+  const errors: string[] = [];
+  if (deadline !== undefined && isNaN(Date.parse(deadline)))
+    errors.push('deadline must be a valid date.');
+  if (errors.length > 0) {
+    return formatResponse(res, 400, "Validation Error", false, null, errors);
   }
-}
+
+  const data: Record<string, unknown> = {};
+  if (title !== undefined) data.title = title.trim();
+  if (description !== undefined) data.description = description.trim();
+  if (deadline !== undefined) data.deadline = new Date(deadline);
+
+  const updated = await prisma.rFQ.update({ where: { id }, data });
+  await logActivity('RFQ', updated.id, 'UPDATED', req.user?.id || existing.created_by);
+  return formatResponse(res, 200, "RFQ updated successfully", true, { data: updated });
+});
+
+export const updateRFQStatus = expressAsyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params['id']);
+  const { status } = req.body as { status?: string };
+
+  if (!status) {
+    return formatResponse(res, 400, "Validation Error", false, null, "status is required.");
+  }
+  const newStatus = parseRFQStatus(status);
+  if (!newStatus) {
+    return formatResponse(res, 400, "Validation Error", false, null, "status must be DRAFT, SENT, or CLOSED.");
+  }
+
+  const existing = await prisma.rFQ.findUnique({ where: { id } });
+  if (!existing) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
+  }
+
+  const allowed = TRANSITIONS[existing.status as RFQStatus];
+  if (!allowed.includes(newStatus)) {
+    return formatResponse(res, 409, "Conflict", false, null, `Cannot transition from ${existing.status} to ${newStatus}. Allowed: ${allowed.join(', ') || 'none'}.`);
+  }
+
+  const updated = await prisma.rFQ.update({ where: { id }, data: { status: newStatus } });
+  await logActivity('RFQ', updated.id, `STATUS_CHANGED:${newStatus}`, req.user?.id || existing.created_by);
+  return formatResponse(res, 200, "RFQ status updated", true, { data: updated });
+});
+
+export const deleteRFQ = expressAsyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params['id']);
+
+  const existing = await prisma.rFQ.findUnique({
+    where: { id },
+    include: { rfqAttachments: { select: { path: true } } },
+  });
+  if (!existing) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
+  }
+  if (existing.status !== 'DRAFT') {
+    return formatResponse(res, 409, "Conflict", false, null, "Only DRAFT RFQs can be deleted.");
+  }
+
+  for (const att of existing.rfqAttachments) {
+    await deleteFileFromS3(att.path, S3_PUBLIC_BUCKET || 'public');
+  }
+
+  await prisma.rFQ.delete({ where: { id } });
+  await logActivity('RFQ', id, 'DELETED', req.user?.id || existing.created_by);
+  return formatResponse(res, 200, "RFQ deleted", true, null);
+});
 
 // ─── Line Items ───────────────────────────────────────────────────────────────
 
-/**
- * POST /api/rfqs/:id/items
- * Add a line item to a DRAFT RFQ
- */
-export async function addItem(req: Request, res: Response): Promise<void> {
-  try {
-    const id = String(req.params['id']);
-    const { product_name, description, quantity, unit, unit_price } = req.body as {
-      product_name?: string; description?: string;
-      quantity?: number; unit?: string; unit_price?: number;
-    };
+export const addItem = expressAsyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params['id']);
+  const { product_name, description, quantity, unit, unit_price } = req.body as {
+    product_name?: string; description?: string;
+    quantity?: number; unit?: string; unit_price?: number;
+  };
 
-    const rfq = await prisma.rFQ.findUnique({ where: { id }, select: { id: true, status: true } });
-    if (!rfq) { res.status(404).json({ error: 'RFQ not found.' }); return; }
-    if (rfq.status !== 'DRAFT') { res.status(409).json({ error: 'Items can only be added to DRAFT RFQs.' }); return; }
-
-    const errors: string[] = [];
-    if (!product_name?.trim()) errors.push('product_name is required.');
-    if (!quantity || Number(quantity) < 1) errors.push('quantity must be >= 1.');
-    if (!unit?.trim()) errors.push('unit is required.');
-    if (errors.length > 0) { res.status(400).json({ errors }); return; }
-
-    const item = await prisma.rFQ_Item.create({
-      data: {
-        rfq_id: id,
-        product_name: product_name!.trim(),
-        description: description?.trim() ?? null,
-        quantity: Number(quantity),
-        unit: unit!.trim(),
-        unit_price: unit_price != null ? unit_price : null,
-      },
-    });
-
-    res.status(201).json({ data: item });
-  } catch (err) {
-    console.error('[addItem]', err);
-    res.status(500).json({ error: 'Failed to add item.' });
+  const rfq = await prisma.rFQ.findUnique({ where: { id }, select: { id: true, status: true } });
+  if (!rfq) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
   }
-}
-
-/**
- * PATCH /api/rfqs/:id/items/:itemId
- */
-export async function updateItem(req: Request, res: Response): Promise<void> {
-  try {
-    const rfqId = String(req.params['id']);
-    const itemId = String(req.params['itemId']);
-    const { product_name, description, quantity, unit, unit_price } = req.body as {
-      product_name?: string; description?: string;
-      quantity?: number; unit?: string; unit_price?: number;
-    };
-
-    const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { status: true } });
-    if (!rfq) { res.status(404).json({ error: 'RFQ not found.' }); return; }
-    if (rfq.status !== 'DRAFT') { res.status(409).json({ error: 'Items can only be edited on DRAFT RFQs.' }); return; }
-
-    const item = await prisma.rFQ_Item.findFirst({ where: { id: itemId, rfq_id: rfqId } });
-    if (!item) { res.status(404).json({ error: 'Item not found.' }); return; }
-
-    const data: Record<string, unknown> = {};
-    if (product_name !== undefined) data.product_name = product_name.trim();
-    if (description !== undefined) data.description = description.trim() || null;
-    if (quantity !== undefined) data.quantity = Number(quantity);
-    if (unit !== undefined) data.unit = unit.trim();
-    if (unit_price !== undefined) data.unit_price = unit_price;
-
-    const updated = await prisma.rFQ_Item.update({ where: { id: itemId }, data });
-    res.json({ data: updated });
-  } catch (err) {
-    console.error('[updateItem]', err);
-    res.status(500).json({ error: 'Failed to update item.' });
+  if (rfq.status !== 'DRAFT') {
+    return formatResponse(res, 409, "Conflict", false, null, "Items can only be added to DRAFT RFQs.");
   }
-}
 
-/**
- * DELETE /api/rfqs/:id/items/:itemId
- */
-export async function deleteItem(req: Request, res: Response): Promise<void> {
-  try {
-    const rfqId = String(req.params['id']);
-    const itemId = String(req.params['itemId']);
-
-    const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { status: true } });
-    if (!rfq) { res.status(404).json({ error: 'RFQ not found.' }); return; }
-    if (rfq.status !== 'DRAFT') { res.status(409).json({ error: 'Items can only be removed from DRAFT RFQs.' }); return; }
-
-    const item = await prisma.rFQ_Item.findFirst({ where: { id: itemId, rfq_id: rfqId } });
-    if (!item) { res.status(404).json({ error: 'Item not found.' }); return; }
-
-    await prisma.rFQ_Item.delete({ where: { id: itemId } });
-    res.json({ message: 'Item removed.' });
-  } catch (err) {
-    console.error('[deleteItem]', err);
-    res.status(500).json({ error: 'Failed to delete item.' });
+  const errors: string[] = [];
+  if (!product_name?.trim()) errors.push('product_name is required.');
+  if (!quantity || Number(quantity) < 1) errors.push('quantity must be >= 1.');
+  if (!unit?.trim()) errors.push('unit is required.');
+  if (errors.length > 0) {
+    return formatResponse(res, 400, "Validation Error", false, null, errors);
   }
-}
+
+  const item = await prisma.rFQ_Item.create({
+    data: {
+      rfq_id: id,
+      product_name: product_name!.trim(),
+      description: description?.trim() ?? null,
+      quantity: Number(quantity),
+      unit: unit!.trim(),
+      unit_price: unit_price != null ? unit_price : null,
+    },
+  });
+
+  return formatResponse(res, 201, "Item added successfully", true, { data: item });
+});
+
+export const updateItem = expressAsyncHandler(async (req: Request, res: Response) => {
+  const rfqId = String(req.params['id']);
+  const itemId = String(req.params['itemId']);
+  const { product_name, description, quantity, unit, unit_price } = req.body as {
+    product_name?: string; description?: string;
+    quantity?: number; unit?: string; unit_price?: number;
+  };
+
+  const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { status: true } });
+  if (!rfq) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
+  }
+  if (rfq.status !== 'DRAFT') {
+    return formatResponse(res, 409, "Conflict", false, null, "Items can only be edited on DRAFT RFQs.");
+  }
+
+  const item = await prisma.rFQ_Item.findFirst({ where: { id: itemId, rfq_id: rfqId } });
+  if (!item) {
+    return formatResponse(res, 404, "Not Found", false, null, "Item not found.");
+  }
+
+  const data: Record<string, unknown> = {};
+  if (product_name !== undefined) data.product_name = product_name.trim();
+  if (description !== undefined) data.description = description.trim() || null;
+  if (quantity !== undefined) data.quantity = Number(quantity);
+  if (unit !== undefined) data.unit = unit.trim();
+  if (unit_price !== undefined) data.unit_price = unit_price;
+
+  const updated = await prisma.rFQ_Item.update({ where: { id: itemId }, data });
+  return formatResponse(res, 200, "Item updated", true, { data: updated });
+});
+
+export const deleteItem = expressAsyncHandler(async (req: Request, res: Response) => {
+  const rfqId = String(req.params['id']);
+  const itemId = String(req.params['itemId']);
+
+  const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { status: true } });
+  if (!rfq) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
+  }
+  if (rfq.status !== 'DRAFT') {
+    return formatResponse(res, 409, "Conflict", false, null, "Items can only be removed from DRAFT RFQs.");
+  }
+
+  const item = await prisma.rFQ_Item.findFirst({ where: { id: itemId, rfq_id: rfqId } });
+  if (!item) {
+    return formatResponse(res, 404, "Not Found", false, null, "Item not found.");
+  }
+
+  await prisma.rFQ_Item.delete({ where: { id: itemId } });
+  return formatResponse(res, 200, "Item removed", true, null);
+});
 
 // ─── Vendor Assignment ────────────────────────────────────────────────────────
 
-/**
- * POST /api/rfqs/:id/vendors
- * Body: { vendor_ids: string[] }
- */
-export async function assignVendors(req: Request, res: Response): Promise<void> {
-  try {
-    const rfqId = String(req.params['id']);
-    const { vendor_ids } = req.body as { vendor_ids?: string[] };
+export const assignVendors = expressAsyncHandler(async (req: Request, res: Response) => {
+  const rfqId = String(req.params['id']);
+  const { vendor_ids } = req.body as { vendor_ids?: string[] };
 
-    if (!Array.isArray(vendor_ids) || vendor_ids.length === 0) {
-      res.status(400).json({ error: 'vendor_ids must be a non-empty array.' }); return;
-    }
-
-    const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { id: true, status: true } });
-    if (!rfq) { res.status(404).json({ error: 'RFQ not found.' }); return; }
-    if (rfq.status === 'CLOSED') { res.status(409).json({ error: 'Cannot assign vendors to a CLOSED RFQ.' }); return; }
-
-    const found = await prisma.vendor.count({ where: { id: { in: vendor_ids } } });
-    if (found !== vendor_ids.length) {
-      res.status(404).json({ error: 'One or more vendor_ids not found.' }); return;
-    }
-
-    // Upsert — skip already-assigned vendors
-    await prisma.rFQ_Vendor.createMany({
-      data: vendor_ids.map((vid) => ({ rfq_id: rfqId, vendor_id: vid })),
-      skipDuplicates: true,
-    });
-
-    const updated = await prisma.rFQ.findUnique({
-      where: { id: rfqId },
-      include: { vendors: { include: { vendor: { select: { id: true, name: true, category: true, status: true } } } } },
-    });
-
-    res.json({ data: updated });
-  } catch (err) {
-    console.error('[assignVendors]', err);
-    res.status(500).json({ error: 'Failed to assign vendors.' });
+  if (!Array.isArray(vendor_ids) || vendor_ids.length === 0) {
+    return formatResponse(res, 400, "Validation Error", false, null, "vendor_ids must be a non-empty array.");
   }
-}
 
-/**
- * DELETE /api/rfqs/:id/vendors/:vendorId
- */
-export async function removeVendor(req: Request, res: Response): Promise<void> {
-  try {
-    const rfqId = String(req.params['id']);
-    const vendorId = String(req.params['vendorId']);
-
-    const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { status: true } });
-    if (!rfq) { res.status(404).json({ error: 'RFQ not found.' }); return; }
-    if (rfq.status === 'CLOSED') { res.status(409).json({ error: 'Cannot modify vendors on a CLOSED RFQ.' }); return; }
-
-    const link = await prisma.rFQ_Vendor.findUnique({
-      where: { rfq_id_vendor_id: { rfq_id: rfqId, vendor_id: vendorId } },
-    });
-    if (!link) { res.status(404).json({ error: 'Vendor not assigned to this RFQ.' }); return; }
-
-    await prisma.rFQ_Vendor.delete({
-      where: { rfq_id_vendor_id: { rfq_id: rfqId, vendor_id: vendorId } },
-    });
-
-    res.json({ message: 'Vendor removed from RFQ.' });
-  } catch (err) {
-    console.error('[removeVendor]', err);
-    res.status(500).json({ error: 'Failed to remove vendor.' });
+  const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { id: true, status: true } });
+  if (!rfq) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
   }
-}
+  if (rfq.status === 'CLOSED') {
+    return formatResponse(res, 409, "Conflict", false, null, "Cannot assign vendors to a CLOSED RFQ.");
+  }
+
+  const found = await prisma.vendor.count({ where: { id: { in: vendor_ids } } });
+  if (found !== vendor_ids.length) {
+    return formatResponse(res, 404, "Not Found", false, null, "One or more vendor_ids not found.");
+  }
+
+  await prisma.rFQ_Vendor.createMany({
+    data: vendor_ids.map((vid) => ({ rfq_id: rfqId, vendor_id: vid })),
+    skipDuplicates: true,
+  });
+
+  const updated = await prisma.rFQ.findUnique({
+    where: { id: rfqId },
+    include: { vendors: { include: { vendor: { select: { id: true, name: true, category: true, status: true } } } } },
+  });
+
+  return formatResponse(res, 200, "Vendors assigned", true, { data: updated });
+});
+
+export const removeVendor = expressAsyncHandler(async (req: Request, res: Response) => {
+  const rfqId = String(req.params['id']);
+  const vendorId = String(req.params['vendorId']);
+
+  const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { status: true } });
+  if (!rfq) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
+  }
+  if (rfq.status === 'CLOSED') {
+    return formatResponse(res, 409, "Conflict", false, null, "Cannot modify vendors on a CLOSED RFQ.");
+  }
+
+  const link = await prisma.rFQ_Vendor.findUnique({
+    where: { rfq_id_vendor_id: { rfq_id: rfqId, vendor_id: vendorId } },
+  });
+  if (!link) {
+    return formatResponse(res, 404, "Not Found", false, null, "Vendor not assigned to this RFQ.");
+  }
+
+  await prisma.rFQ_Vendor.delete({
+    where: { rfq_id_vendor_id: { rfq_id: rfqId, vendor_id: vendorId } },
+  });
+
+  return formatResponse(res, 200, "Vendor removed from RFQ", true, null);
+});
 
 // ─── Attachments ──────────────────────────────────────────────────────────────
 
-/**
- * POST /api/rfqs/:id/attachments
- * Multipart — field name: "file" (single file per request)
- */
-export async function uploadAttachment(req: Request, res: Response): Promise<void> {
-  try {
-    const rfqId = String(req.params['id']);
+export const uploadAttachment = expressAsyncHandler(async (req: Request, res: Response) => {
+  const rfqId = String(req.params['id']);
 
-    const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { id: true, status: true } });
-    if (!rfq) {
-      res.status(404).json({ error: 'RFQ not found.' }); return;
-    }
-
-    if (!req.file) { res.status(400).json({ error: 'No file uploaded. Use field name "file".' }); return; }
-
-    const uploaded = await uploadBufferToS3({
-      prefix: `rfq-attachments/${rfqId}`,
-      buffer: req.file.buffer,
-      contentType: req.file.mimetype,
-      Bucket: S3_PUBLIC_BUCKET || 'public',
-    });
-
-    if (!uploaded?.Key) {
-      res.status(500).json({ error: 'Failed to upload attachment to S3.' }); return;
-    }
-
-    const attachment = await prisma.rFQ_Attachment.create({
-      data: {
-        rfq_id: rfqId,
-        filename: req.file.originalname,
-        original_name: req.file.originalname,
-        mime_type: req.file.mimetype,
-        size_bytes: req.file.size,
-        path: uploaded.Key,
-      },
-    });
-
-    res.status(201).json({ data: attachment });
-  } catch (err) {
-    console.error('[uploadAttachment]', err);
-    res.status(500).json({ error: 'Failed to save attachment.' });
+  const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { id: true, status: true } });
+  if (!rfq) {
+    return formatResponse(res, 404, "Not Found", false, null, "RFQ not found.");
   }
-}
 
-/**
- * DELETE /api/rfqs/:id/attachments/:attachmentId
- */
-export async function deleteAttachment(req: Request, res: Response): Promise<void> {
-  try {
-    const rfqId = String(req.params['id']);
-    const attachmentId = String(req.params['attachmentId']);
-
-    const attachment = await prisma.rFQ_Attachment.findFirst({
-      where: { id: attachmentId, rfq_id: rfqId },
-    });
-    if (!attachment) { res.status(404).json({ error: 'Attachment not found.' }); return; }
-
-    // Delete file from S3
-    await deleteFileFromS3(attachment.path, S3_PUBLIC_BUCKET || 'public');
-
-    await prisma.rFQ_Attachment.delete({ where: { id: attachmentId } });
-    res.json({ message: 'Attachment deleted.' });
-  } catch (err) {
-    console.error('[deleteAttachment]', err);
-    res.status(500).json({ error: 'Failed to delete attachment.' });
+  if (!req.file) {
+    return formatResponse(res, 400, "Validation Error", false, null, 'No file uploaded. Use field name "file".');
   }
-}
+
+  const uploaded = await uploadBufferToS3({
+    prefix: `rfq-attachments/${rfqId}`,
+    buffer: req.file.buffer,
+    contentType: req.file.mimetype,
+    Bucket: S3_PUBLIC_BUCKET || 'public',
+  });
+
+  if (!uploaded?.Key) {
+    return formatResponse(res, 500, "Server Error", false, null, "Failed to upload attachment to S3.");
+  }
+
+  const attachment = await prisma.rFQ_Attachment.create({
+    data: {
+      rfq_id: rfqId,
+      filename: req.file.originalname,
+      original_name: req.file.originalname,
+      mime_type: req.file.mimetype,
+      size_bytes: req.file.size,
+      path: uploaded.Key,
+    },
+  });
+
+  return formatResponse(res, 201, "Attachment uploaded", true, { data: attachment });
+});
+
+export const deleteAttachment = expressAsyncHandler(async (req: Request, res: Response) => {
+  const rfqId = String(req.params['id']);
+  const attachmentId = String(req.params['attachmentId']);
+
+  const attachment = await prisma.rFQ_Attachment.findFirst({
+    where: { id: attachmentId, rfq_id: rfqId },
+  });
+  if (!attachment) {
+    return formatResponse(res, 404, "Not Found", false, null, "Attachment not found.");
+  }
+
+  await deleteFileFromS3(attachment.path, S3_PUBLIC_BUCKET || 'public');
+
+  await prisma.rFQ_Attachment.delete({ where: { id: attachmentId } });
+  return formatResponse(res, 200, "Attachment deleted", true, null);
+});

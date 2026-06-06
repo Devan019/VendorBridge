@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import path from 'path';
 import cors from 'cors';
-import express, { Application, Request, Response } from 'express';
+import express, { Application, Request, Response, NextFunction } from 'express';
+import { formatResponse } from './utils/formateResponse';
 import vendorRoutes from './vendor/route';
 import rfqRoutes from './rfq/route';
 import quotationRoutes, { listRFQQuotations } from './quotation/route';
@@ -77,7 +78,15 @@ app.get('/api/quotations/:quotationId/approvals', getApprovalTimeline);
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {
-  res.status(404).json({ error: 'Route not found.' });
+  formatResponse(res, 404, "Route not found.", false);
+});
+
+// ── Global Error Handler ──────────────────────────────────────────────────────
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[Global Error]', err);
+  const status = err.statusCode || 500;
+  const message = err.message || 'Internal Server Error';
+  formatResponse(res, status, message, false, null, message);
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

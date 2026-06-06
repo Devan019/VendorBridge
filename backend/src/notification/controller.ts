@@ -229,6 +229,6 @@ export const exportLogs = expressAsyncHandler(async (req: Request, res: Response
     // JSON
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Content-Disposition", "attachment; filename=activity_logs.json");
-    res.json(logs);
+    return formatResponse(res, 200, "Activity logs exported", true, { data: logs });
   }
 });

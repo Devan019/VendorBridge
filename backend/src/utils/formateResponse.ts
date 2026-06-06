@@ -6,7 +6,7 @@ export const formatResponse = <T>(
     message: string,
     success: boolean,
     data?: T,
-    error?: string
+    error?: string | string[]
 ) => {
     return res.status(statusCode).json({
         MESSAGE: message,

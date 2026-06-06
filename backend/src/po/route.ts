@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { isAuthenticated } from "../middleware";
 
+import { formatResponse } from "../utils/formateResponse";
+
 const restrictTo = (...roles: string[]) => {
   return (req: any, res: any, next: any) => {
     if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: "Forbidden" });
+      return formatResponse(res, 403, "Forbidden", false, null);
     }
     next();
   };
