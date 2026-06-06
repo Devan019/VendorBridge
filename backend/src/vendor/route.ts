@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  getMyVendor,
   addVendorNote,
   createVendor,
   deleteVendor,
@@ -30,8 +31,9 @@ router.use(isAuthenticated);
 router.get('/', listVendors);
 router.post('/', isAuthorized(['ADMIN', 'PROCUREMENT_OFFICER']), createVendor);
 
-// Static sub-path must come BEFORE the dynamic :id routes
+// Static sub-paths BEFORE dynamic :id
 router.get('/categories', listCategories);
+router.get('/me', getMyVendor); // vendor finds their own profile by email
 
 router.get('/:id', getVendor);
 router.patch('/:id', isAuthorized(['ADMIN', 'PROCUREMENT_OFFICER']), updateVendor);

@@ -7,10 +7,14 @@ import { rfqApi, RFQ } from '@/lib/api/rfq';
 import { FrontendRoutes } from '@/constants/frontend_route';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { motion } from 'framer-motion';
 import { Plus, Search, FileText, Calendar, Clock, ChevronRight } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import {motion} from "framer-motion"
 
 export default function RFQDashboardPage() {
+  const { user } = useAuth();
+  const isVendor = user?.role === 'VENDOR';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
 
@@ -40,11 +44,13 @@ export default function RFQDashboardPage() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Requests for Quotation</h1>
           <p className="text-muted-foreground mt-1">Manage and track your active and past RFQs.</p>
         </div>
-        <Link href={FrontendRoutes.NEW_RFQ}>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" /> New RFQ
-          </Button>
-        </Link>
+        {!isVendor && (
+          <Link href={FrontendRoutes.NEW_RFQ}>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" /> New RFQ
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border p-4 mb-6 flex flex-col md:flex-row gap-4">

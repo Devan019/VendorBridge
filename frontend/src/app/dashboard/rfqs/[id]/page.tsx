@@ -7,12 +7,15 @@ import Link from 'next/link';
 import { rfqApi, RFQStatus, RFQVendor, RFQItem, RFQAttachment } from '@/lib/api/rfq';
 import { FrontendRoutes } from '@/constants/frontend_route';
 import { Button } from '@/components/ui/Button';
-import { motion } from 'framer-motion';
-import { Calendar, Clock, FileText, Download, Trash2, Edit, ChevronLeft, Package, User } from 'lucide-react';
+import { Calendar, Clock, FileText, Download, Trash2, Edit, ChevronLeft, Package, User, Send } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
-export default function RFQDetailsPage() {
+const Page = () =>{
+
   const { id } = useParams() as { id: string };
   const router = useRouter();
+  const { user } = useAuth();
+  const isVendor = user?.role === 'VENDOR';
 
   const { data: rfqResponse, isLoading, refetch } = useQuery({
     queryKey: ['rfq', id],
@@ -112,7 +115,16 @@ export default function RFQDetailsPage() {
           </div>
 
           <div className="flex flex-col gap-2 w-full md:w-auto">
-            {rfq.status === 'DRAFT' && (
+            {isVendor && rfq.status === 'SENT' && (
+              <Button 
+                onClick={() => router.push(`/dashboard/rfqs/${id}/quote`)} 
+                className="w-full md:w-auto gap-2"
+              >
+                <Send className="w-4 h-4" /> Submit Quotation
+              </Button>
+            )}
+            
+            {!isVendor && rfq.status === 'DRAFT' && (
               <>
                 <Button 
                   onClick={() => handleStatusChange('SENT')} 
@@ -131,7 +143,7 @@ export default function RFQDetailsPage() {
                 </Button>
               </>
             )}
-            {rfq.status === 'SENT' && (
+            {!isVendor && rfq.status === 'SENT' && (
               <Button 
                 variant="outline" 
                 onClick={() => handleStatusChange('CLOSED')} 
@@ -255,3 +267,5 @@ export default function RFQDetailsPage() {
     </div>
   );
 }
+
+export default Page

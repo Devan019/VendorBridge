@@ -39,7 +39,7 @@ export default function NewRFQPage() {
   // Fetch registered vendors for assignment
   const { data: vendorsData, isLoading: isLoadingVendors } = useQuery({
     queryKey: ['vendors', 'list'],
-    queryFn: () => vendorApi.listVendors()
+    queryFn: () => vendorApi.listVendors({ limit: 1000 })
   });
   const vendorsList: Vendor[] = vendorsData?.data || [];
 
