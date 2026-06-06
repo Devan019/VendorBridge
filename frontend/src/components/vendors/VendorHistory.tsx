@@ -65,13 +65,13 @@ export function VendorHistory({ vendorId }: { vendorId: string }) {
             >
               <div className="flex justify-between items-start mb-2">
                 <span className="font-medium text-sm">
-                  {note.created_by?.first_name} {note.created_by?.last_name}
+                  {note.author?.name || 'Unknown User'}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {new Date(note.created_at).toLocaleString()}
                 </span>
               </div>
-              <p className="text-sm text-foreground">{note.note}</p>
+              <p className="text-sm text-foreground">{note.content}</p>
             </motion.div>
           ))
         )}

@@ -264,7 +264,8 @@ export const getVendorHistory = expressAsyncHandler(async (req: Request, res: Re
 
 export const addVendorNote = expressAsyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params['id']);
-  const { content, author_id } = req.body as { content?: string; author_id?: string };
+  const { content } = req.body as { content?: string };
+  const author_id = req.user?.id;
 
   if (!content?.trim()) { 
     return formatResponse(res, 400, "Validation Error", false, null, "content is required."); 

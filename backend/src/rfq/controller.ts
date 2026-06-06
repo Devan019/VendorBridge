@@ -108,11 +108,10 @@ export const listRFQs = expressAsyncHandler(async (req: Request, res: Response) 
 });
 
 export const createRFQ = expressAsyncHandler(async (req: Request, res: Response) => {
-  const { title, description, deadline, created_by, items, vendor_ids, status } = req.body as {
+  const { title, description, deadline, items, vendor_ids, status } = req.body as {
     title?: string;
     description?: string;
     deadline?: string;
-    created_by?: string;
     items?: Array<{
       product_name?: string;
       description?: string;
@@ -124,12 +123,14 @@ export const createRFQ = expressAsyncHandler(async (req: Request, res: Response)
     status?: string;
   };
 
+  const created_by = req.user?.id;
+
   const errors: string[] = [];
   if (!title?.trim()) errors.push('title is required.');
   if (!description?.trim()) errors.push('description is required.');
   if (!deadline) errors.push('deadline is required.');
   else if (isNaN(Date.parse(deadline))) errors.push('deadline must be a valid date.');
-  if (!created_by?.trim()) errors.push('created_by (user id) is required.');
+  if (!created_by) errors.push('User is not authenticated (missing created_by).');
 
   if (Array.isArray(items) && items.length > 0) {
     items.forEach((item, i) => {

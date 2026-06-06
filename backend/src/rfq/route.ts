@@ -46,8 +46,8 @@ router.get('/', listRFQs);
 router.post('/', createRFQ);
 
 router.get('/:id', getRFQ);
-router.patch('/:id', updateRFQ);
 router.patch('/:id/status', updateRFQStatus);
+router.patch('/:id', updateRFQ);
 router.delete('/:id', deleteRFQ);
 
 router.post('/:id/items', addItem);

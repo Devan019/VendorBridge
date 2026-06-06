@@ -117,11 +117,11 @@ export default function VendorProfilePage() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between py-1 border-b">
                 <span className="text-muted-foreground">Registered</span>
-                <span className="font-medium">{new Date(vendor.createdAt).toLocaleDateString()}</span>
+                <span className="font-medium">{new Date(vendor.created_at).toLocaleDateString()}</span>
               </div>
               <div className="flex justify-between py-1 border-b">
                 <span className="text-muted-foreground">Last Updated</span>
-                <span className="font-medium">{new Date(vendor.updatedAt).toLocaleDateString()}</span>
+                <span className="font-medium">{new Date(vendor.updated_at).toLocaleDateString()}</span>
               </div>
               <div className="pt-2">
                 <span className="text-muted-foreground block mb-2">Tags</span>

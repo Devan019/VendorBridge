@@ -12,19 +12,20 @@ export interface Vendor {
   address?: string;
   tags: string[];
   status: VendorStatus;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface VendorNote {
   id: string;
   vendor_id: string;
-  created_by_id: string;
-  note: string;
+  author_id?: string;
+  content: string;
   created_at: string;
-  created_by?: {
-    first_name: string;
-    last_name: string;
+  author?: {
+    id: string;
+    name: string;
+    email: string;
   }
 }
 
@@ -65,7 +66,7 @@ export const vendorApi = {
   },
 
   addVendorNote: async (id: string, note: string) => {
-    const res = await axios_api.post(`/vendors/${id}/notes`, { note });
+    const res = await axios_api.post(`/vendors/${id}/notes`, { content: note });
     return res.data.DATA || res.data;
   }
 };
