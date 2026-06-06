@@ -310,7 +310,7 @@ export async function deleteRFQ(req: Request, res: Response): Promise<void> {
 
     const existing = await prisma.rFQ.findUnique({
       where: { id },
-      include: { attachments: { select: { path: true } } },
+      include: { rfqAttachments : { select: { path: true } } },
     });
     if (!existing) { res.status(404).json({ error: 'RFQ not found.' }); return; }
     if (existing.status !== 'DRAFT') {
@@ -318,7 +318,7 @@ export async function deleteRFQ(req: Request, res: Response): Promise<void> {
     }
 
     // Remove uploaded files from disk before DB delete
-    for (const att of existing.attachments) {
+    for (const att of existing.rfqAttachments ) {
       if (fs.existsSync(att.path)) fs.unlinkSync(att.path);
     }
 

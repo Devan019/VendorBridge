@@ -13,7 +13,7 @@ import {
   removeVendor,
   uploadAttachment,
   deleteAttachment,
-} from '../controllers/rfq.controller';
+} from './controller';
 import { rfqUpload } from '../lib/upload';
 
 const router = Router();

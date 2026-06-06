@@ -4,12 +4,12 @@ import { formatResponse } from "../utils/formateResponse";
 import { ACCESS_TOKEN_MAX_AGE_MS } from "../env_var";
 import {
   AuthError,
-  forgotPassword,
-  loginUser,
-  refreshAuthToken,
-  resetPassword,
+  forgotPasswordService,
+  loginService,
+  refreshToken as refreshAuthToken,
+  resetPasswordService,
   revokeRefreshToken,
-  signupUser,
+  signupService,
 } from "./service";
 import { forgotPasswordSchema, loginSchema, resetPasswordSchema, signupSchema } from "./zod_shcema";
 

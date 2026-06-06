@@ -35,17 +35,17 @@ function qs(val: unknown, fallback = ''): string {
  */
 export async function listVendors(req: Request, res: Response): Promise<void> {
   try {
-    const search   = qs(req.query.search);
-    const status   = qs(req.query.status);
+    const search = qs(req.query.search);
+    const status = qs(req.query.status);
     const category = qs(req.query.category);
-    const sortBy   = qs(req.query.sortBy, 'created_at');
-    const order    = qs(req.query.order,  'desc');
-    const page     = qs(req.query.page,   '1');
-    const limit    = qs(req.query.limit,  '20');
+    const sortBy = qs(req.query.sortBy, 'created_at');
+    const order = qs(req.query.order, 'desc');
+    const page = qs(req.query.page, '1');
+    const limit = qs(req.query.limit, '20');
 
-    const pageNum  = Math.max(1, parseInt(page, 10));
+    const pageNum = Math.max(1, parseInt(page, 10));
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
-    const skip     = (pageNum - 1) * limitNum;
+    const skip = (pageNum - 1) * limitNum;
 
     const allowedSortFields: Record<string, boolean> = {
       name: true, category: true, status: true, created_at: true, updated_at: true,
@@ -57,10 +57,10 @@ export async function listVendors(req: Request, res: Response): Promise<void> {
 
     if (search.trim()) {
       where.OR = [
-        { name:          { contains: search.trim(), mode: 'insensitive' } },
+        { name: { contains: search.trim(), mode: 'insensitive' } },
         { contact_email: { contains: search.trim(), mode: 'insensitive' } },
-        { gst_number:    { contains: search.trim(), mode: 'insensitive' } },
-        { category:      { contains: search.trim(), mode: 'insensitive' } },
+        { gst_number: { contains: search.trim(), mode: 'insensitive' } },
+        { category: { contains: search.trim(), mode: 'insensitive' } },
       ];
     }
     if (status) {
@@ -125,9 +125,9 @@ export async function createVendor(req: Request, res: Response): Promise<void> {
     };
 
     const errors: string[] = [];
-    if (!name?.trim())          errors.push('name is required.');
-    if (!category?.trim())      errors.push('category is required.');
-    if (!gst_number?.trim())    errors.push('gst_number is required.');
+    if (!name?.trim()) errors.push('name is required.');
+    if (!category?.trim()) errors.push('category is required.');
+    if (!gst_number?.trim()) errors.push('gst_number is required.');
     else if (!isValidGST(gst_number))
       errors.push('gst_number is not a valid Indian GST number (e.g. 22AAAAA0000A1Z5).');
     if (!contact_email?.trim()) errors.push('contact_email is required.');
@@ -140,14 +140,15 @@ export async function createVendor(req: Request, res: Response): Promise<void> {
 
     const vendor = await prisma.vendor.create({
       data: {
-        name:          name!.trim(),
-        category:      category!.trim(),
-        gst_number:    gst_number!.toUpperCase().trim(),
+        name: name!.trim(),
+        category: category!.trim(),
+        gst_number: gst_number!.toUpperCase().trim(),
         contact_email: contact_email!.trim().toLowerCase(),
-        phone:    phone?.trim()   || null,
-        address:  address?.trim() || null,
-        tags:     Array.isArray(tags) ? tags.map((t) => t.trim()).filter(Boolean) : [],
-        status:   parsedStatus,
+        phone: phone?.trim() || null,
+        address: address?.trim() || null,
+        tags: Array.isArray(tags) ? tags.map((t) => t.trim()).filter(Boolean) : [],
+        status: parsedStatus,
+        updated_at: new Date(),
       },
     });
 
@@ -216,14 +217,15 @@ export async function updateVendor(req: Request, res: Response): Promise<void> {
     if (errors.length > 0) { res.status(400).json({ errors }); return; }
 
     const data: Record<string, unknown> = {};
-    if (name          !== undefined) data.name          = name.trim();
-    if (category      !== undefined) data.category      = category.trim();
-    if (gst_number    !== undefined) data.gst_number    = gst_number.toUpperCase().trim();
+    if (name !== undefined) data.name = name.trim();
+    if (category !== undefined) data.category = category.trim();
+    if (gst_number !== undefined) data.gst_number = gst_number.toUpperCase().trim();
     if (contact_email !== undefined) data.contact_email = contact_email.trim().toLowerCase();
-    if (phone         !== undefined) data.phone         = phone.trim()   || null;
-    if (address       !== undefined) data.address       = address.trim() || null;
-    if (tags          !== undefined) data.tags          = tags.map((t) => t.trim()).filter(Boolean);
-    if (status        !== undefined) data.status        = parseStatus(status);
+    if (phone !== undefined) data.phone = phone.trim() || null;
+    if (address !== undefined) data.address = address.trim() || null;
+    if (tags !== undefined) data.tags = tags.map((t) => t.trim()).filter(Boolean);
+    if (status !== undefined) data.status = parseStatus(status);
+    data.updated_at = new Date();
 
     const updated = await prisma.vendor.update({ where: { id }, data });
     res.json({ data: updated });
@@ -243,7 +245,7 @@ export async function updateVendor(req: Request, res: Response): Promise<void> {
  */
 export async function deleteVendor(req: Request, res: Response): Promise<void> {
   try {
-    const id   = String(req.params['id']);
+    const id = String(req.params['id']);
     const hard = qs(req.query.hard) === 'true';
 
     const existing = await prisma.vendor.findUnique({ where: { id } });
@@ -255,7 +257,7 @@ export async function deleteVendor(req: Request, res: Response): Promise<void> {
     } else {
       const updated = await prisma.vendor.update({
         where: { id },
-        data:  { status: VendorStatus.INACTIVE },
+        data: { status: VendorStatus.INACTIVE },
       });
       res.json({ message: 'Vendor deactivated.', data: updated });
     }
@@ -276,7 +278,7 @@ export async function getVendorHistory(req: Request, res: Response): Promise<voi
     if (!vendor) { res.status(404).json({ error: 'Vendor not found.' }); return; }
 
     const notes = await prisma.vendorNote.findMany({
-      where:   { vendor_id: id },
+      where: { vendor_id: id },
       orderBy: { created_at: 'desc' },
       include: { author: { select: { id: true, name: true, email: true } } },
     });
@@ -305,7 +307,7 @@ export async function addVendorNote(req: Request, res: Response): Promise<void> 
     const note = await prisma.vendorNote.create({
       data: {
         vendor_id: id,
-        content:   content.trim(),
+        content: content.trim(),
         author_id: author_id ?? null,
       },
       include: { author: { select: { id: true, name: true, email: true } } },
@@ -326,8 +328,8 @@ export async function listCategories(_req: Request, res: Response): Promise<void
   try {
     const rows = await prisma.vendor.findMany({
       distinct: ['category'],
-      select:   { category: true },
-      orderBy:  { category: 'asc' },
+      select: { category: true },
+      orderBy: { category: 'asc' },
     });
     res.json({ data: rows.map((r) => r.category) });
   } catch (err) {

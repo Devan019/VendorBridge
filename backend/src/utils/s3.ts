@@ -2,7 +2,7 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import { S3_CDN, S3_PUBLIC_BUCKET, S3_PRIVATE_BUCKET } from '../env_var';
+import {  S3_PUBLIC_BUCKET, S3_PRIVATE_BUCKET } from '../env_var';
 
 const S3_ROOT = path.join(process.cwd(), 'uploads', 's3');
 
@@ -26,9 +26,6 @@ function keyPath(bucket: string, key: string) {
 function publicUrlForBucket(bucket: string, key: string) {
   const bucketName = bucket || 'public';
   const normalizedKey = key.replace(/\\/g, '/');
-  if (S3_CDN) {
-    return `${S3_CDN.replace(/\/$/, '')}/uploads/s3/${bucketName}/${normalizedKey}`;
-  }
   return `/uploads/s3/${bucketName}/${normalizedKey}`;
 }
 

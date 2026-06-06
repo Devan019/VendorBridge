@@ -171,6 +171,7 @@ export async function signupService(input: SignupInput, file?: Express.Multer.Fi
         phone: input.phone?.trim() || null,
         country: input.country?.trim() || null,
         image_url: imageUrl,
+        
       },
     });
 
@@ -339,7 +340,7 @@ export async function forgotPasswordService(input: ForgotPasswordInput): Promise
 }
 
 export async function resetPasswordService(input: ResetPasswordInput): Promise<{ message: string }> {
-  const hashedIncoming = hashToken(input.token);
+  const hashedIncoming = hashToken(input.reset_token);
 
   const resetRecord = await prisma.refreshToken.findFirst({
     where: {

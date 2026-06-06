@@ -8,7 +8,7 @@ import {
   listCategories,
   listVendors,
   updateVendor,
-} from '../controllers/vendor.controller';
+} from './controller';
 
 const router = Router();
 

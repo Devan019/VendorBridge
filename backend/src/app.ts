@@ -2,8 +2,9 @@ import 'dotenv/config';
 import path from 'path';
 import cors from 'cors';
 import express, { Application, Request, Response } from 'express';
-import vendorRoutes from './routes/vendor.routes';
-import rfqRoutes from './routes/rfq.routes';
+import vendorRoutes from './vendor/route';
+import rfqRoutes from './rfq/route';
+import quotationRoutes, { listRFQQuotations } from './quotation/route';
 import authRoutes from './auth/route';
 
 const app: Application = express();
@@ -55,6 +56,9 @@ app.get('/', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/rfqs', rfqRoutes);
+app.use('/api/quotations', quotationRoutes);
+// Nested: GET /api/rfqs/:rfqId/quotations
+app.get('/api/rfqs/:rfqId/quotations', listRFQQuotations);
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {
