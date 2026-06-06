@@ -1,98 +1,74 @@
-import fs from 'fs';
-import fsp from 'fs/promises';
-import path from 'path';
 import crypto from 'crypto';
-import {  S3_PUBLIC_BUCKET, S3_PRIVATE_BUCKET } from '../env_var';
+import path from 'path';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CopyObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { S3_ACCESS_KEY, S3_SECRET_KEY, S3_API, S3_PRIVATE_BUCKET, S3_PUBLIC_BUCKET, S3_REGION } from '../env_var';
 
-const S3_ROOT = path.join(process.cwd(), 'uploads', 's3');
+const s3Client = new S3Client({
+  region: S3_REGION || "auto",
+  endpoint: S3_API,
+  credentials: {
+    accessKeyId: S3_ACCESS_KEY || "",
+    secretAccessKey: S3_SECRET_KEY || "",
+  },
+});
 
-function ensureDirSync(dirPath: string) {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-}
-
-function bucketPath(bucket: string) {
-  const safeBucket = bucket || 'default';
-  const dirPath = path.join(S3_ROOT, safeBucket);
-  ensureDirSync(dirPath);
-  return dirPath;
-}
-
-function keyPath(bucket: string, key: string) {
-  return path.join(bucketPath(bucket), key);
-}
-
-function publicUrlForBucket(bucket: string, key: string) {
-  const bucketName = bucket || 'public';
-  const normalizedKey = key.replace(/\\/g, '/');
-  return `/uploads/s3/${bucketName}/${normalizedKey}`;
-}
-
-const generateSignedUrl = async (key: string, Bucket: string, _expiresIn: number = 3600) => {
+const generateSignedUrl = async (key: string, Bucket: string, expiresIn: number = 3600) => {
   try {
-    return publicUrlForBucket(Bucket, key);
+    const command = new GetObjectCommand({
+      Bucket,
+      Key: key,
+    });
+    return await getSignedUrl(s3Client, command, { expiresIn });
   } catch (error) {
     console.log('Error generating signed URL:', error);
     return null;
   }
 };
 
+const getS3PublicUrl = (key: string) => {
+  if (!key) return null;
+  // Fallback if not configured for public domain, though returning API endpoint usually requires it to be public
+  return `${S3_API}/${S3_PUBLIC_BUCKET || 'public'}/${key}`;
+};
+
 const helperUpload = async (
   { prefix, Body, contentType, Bucket }: { prefix: string, Body: any, contentType: string, Bucket: string }
 ) => {
   try {
-    const bucketDir = bucketPath(Bucket);
     const normalizedPrefix = prefix.replace(/^\/+|\/+$/g, '');
-    const targetDir = path.join(bucketDir, normalizedPrefix);
-    ensureDirSync(targetDir);
-
     const fileName = `${crypto.randomUUID()}`;
     const key = path.posix.join(normalizedPrefix, fileName);
-    const destination = path.join(bucketDir, key);
-    ensureDirSync(path.dirname(destination));
 
-    if (typeof Body?.pipe === 'function') {
-      await new Promise<void>((resolve, reject) => {
-        const writeStream = fs.createWriteStream(destination);
-        Body.pipe(writeStream);
-        Body.on('error', reject);
-        writeStream.on('error', reject);
-        writeStream.on('finish', () => resolve());
-      });
-    } else if (Buffer.isBuffer(Body)) {
-      await fsp.writeFile(destination, Body);
-    } else if (typeof Body === 'string') {
-      await fsp.copyFile(Body, destination);
-    } else {
-      await fsp.writeFile(destination, Buffer.from(String(Body ?? '')));
-    }
+    const command = new PutObjectCommand({
+      Bucket,
+      Key: key,
+      Body,
+      ContentType: contentType,
+    });
+
+    await s3Client.send(command);
 
     return {
       Key: key,
-      Location: publicUrlForBucket(Bucket, key),
+      Location: getS3PublicUrl(key),
       ContentType: contentType,
     };
   } catch (error) {
-    console.log('Error uploading file to local S3 helper:', error);
+    console.log('Error uploading file to S3:', error);
     return null;
   }
-};
-
-const getS3PublicUrl = (key: string) => {
-  if (!key) return null;
-  const bucket = S3_PUBLIC_BUCKET || 'public';
-  return publicUrlForBucket(bucket, key);
 };
 
 const uploadFileToS3 = async (
   { prefix, filePath, contentType, Bucket }: { prefix: string, filePath: string, contentType: string, Bucket: string }
 ) => {
   try {
-    const buffer = await fsp.readFile(filePath);
+    const fs = await import('fs/promises');
+    const buffer = await fs.readFile(filePath);
     return helperUpload({ prefix, Body: buffer, contentType, Bucket });
   } catch (error) {
-    console.log('Error uploading file to local S3 helper:', error);
+    console.log('Error uploading file to S3:', error);
     return null;
   }
 };
@@ -109,7 +85,7 @@ const uploadUrlToS3 = async (
     const buffer = Buffer.from(await response.arrayBuffer());
     return helperUpload({ prefix, Body: buffer, contentType, Bucket });
   } catch (error) {
-    console.log('Error uploading URL to local S3 helper:', error);
+    console.log('Error uploading URL to S3:', error);
     return null;
   }
 };
@@ -126,15 +102,27 @@ const moveKeyToPublicS3 = async ({ key, contentType }: { key: string, contentTyp
       throw new Error('S3_PRIVATE_BUCKET and S3_PUBLIC_BUCKET must be defined');
     }
 
-    const sourcePath = keyPath(S3_PRIVATE_BUCKET, key);
-    const buffer = await fsp.readFile(sourcePath);
-
-    return helperUpload({
-      prefix: path.posix.dirname(key),
-      Body: buffer,
-      contentType,
+    const copyCommand = new CopyObjectCommand({
       Bucket: S3_PUBLIC_BUCKET,
+      CopySource: `${S3_PRIVATE_BUCKET}/${key}`,
+      Key: key,
+      ContentType: contentType,
     });
+    
+    await s3Client.send(copyCommand);
+    
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: S3_PRIVATE_BUCKET,
+      Key: key,
+    });
+    
+    await s3Client.send(deleteCommand);
+
+    return {
+      Key: key,
+      Location: getS3PublicUrl(key),
+      ContentType: contentType,
+    };
   } catch (error) {
     console.log('Error moving file to public S3:', error);
     return null;
@@ -147,15 +135,27 @@ const moveKeyToPrivateS3 = async ({ key, contentType }: { key: string, contentTy
       throw new Error('S3_PRIVATE_BUCKET and S3_PUBLIC_BUCKET must be defined');
     }
 
-    const sourcePath = keyPath(S3_PUBLIC_BUCKET, key);
-    const buffer = await fsp.readFile(sourcePath);
-
-    return helperUpload({
-      prefix: path.posix.dirname(key),
-      Body: buffer,
-      contentType,
+    const copyCommand = new CopyObjectCommand({
       Bucket: S3_PRIVATE_BUCKET,
+      CopySource: `${S3_PUBLIC_BUCKET}/${key}`,
+      Key: key,
+      ContentType: contentType,
     });
+    
+    await s3Client.send(copyCommand);
+    
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: S3_PUBLIC_BUCKET,
+      Key: key,
+    });
+    
+    await s3Client.send(deleteCommand);
+
+    return {
+      Key: key,
+      Location: getS3PublicUrl(key),
+      ContentType: contentType,
+    };
   } catch (error) {
     console.log('Error moving file to private S3:', error);
     return null;
@@ -164,10 +164,13 @@ const moveKeyToPrivateS3 = async ({ key, contentType }: { key: string, contentTy
 
 const deleteFileFromS3 = async (key: string, Bucket: string) => {
   try {
-    const filePath = keyPath(Bucket, key);
-    await fsp.unlink(filePath);
+    const command = new DeleteObjectCommand({
+      Bucket,
+      Key: key,
+    });
+    await s3Client.send(command);
   } catch (error) {
-    console.log('Error deleting file from local S3 helper:', error);
+    console.log('Error deleting file from S3:', error);
     return null;
   }
 };

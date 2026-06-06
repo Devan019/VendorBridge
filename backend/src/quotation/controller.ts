@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { QuotationStatus } from '../generated/prisma/enums';
+import { ApprovalStatus, QuotationStatus } from '../generated/prisma/enums';
 import prisma from '../utils/prisma';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -409,8 +409,11 @@ export async function updateQuotationStatus(req: Request, res: Response): Promis
           data: {
             quotation_id: id,
             approver_id: approverId,
-            status: newStatus,
+            status: newStatus === QuotationStatus.ACCEPTED
+                            ? ApprovalStatus.APPROVED
+                            : ApprovalStatus.REJECTED,
             remarks: remarks?.trim() ?? null,
+            decided_at:   new Date(),
           },
         });
       }

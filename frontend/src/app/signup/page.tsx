@@ -11,8 +11,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { api } from '@/lib/api';
-import { useAuthStore } from '@/store/useAuthStore';
+import axios_api from '@/lib/axios_api';
+import { useAuth } from '@/context/AuthContext';
 
 const signupSchema = z.object({
   first_name: z.string().min(2, 'First name is required'),
@@ -29,7 +29,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupPage() {
   const router = useRouter();
-  const setUser = useAuthStore((state) => state.setUser);
+  const { setUser } = useAuth();
   const [serverError, setServerError] = useState('');
 
   const {
@@ -62,7 +62,7 @@ export default function SignupPage() {
         formData.append('image', data.image[0]);
       }
 
-      const res = await api.post('/auth/signup', formData, {
+      const res = await axios_api.post('/auth/signup', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

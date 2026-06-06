@@ -27,6 +27,7 @@ enum UserRole {
   MANAGER
   PROCUREMENT_OFFICER
   VENDOR
+  REVIEWER
 }
 enum QuotationStatus {
   SUBMITTED
@@ -35,25 +36,49 @@ enum QuotationStatus {
   REJECTED
 }
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
+enum POStatus {
+  DRAFT
+  ISSUED
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
-  id             String         @id @default(uuid())
-  first_name           String
-  last_name            String
-  email          String         @unique
-  password_hash  String
-  role           UserRole
-  phone          String?
-  country        String?
-  image_key      String?
-  created_at     DateTime       @default(now())
-  logs           ActivityLog[]
-  approvals      Approval[]
-  notifications  Notification[]
-  rfqs           RFQ[]          @relation("CreatedBy")
-  refresh_tokens RefreshToken[]
-  vendorNotes    VendorNote[]
+  id            String          @id @default(uuid())
+  first_name    String          @default("")
+  last_name     String          @default("")
+  name          String          // full name — kept for backward-compat with other controllers
+  email         String          @unique
+  password_hash String
+  role          UserRole        @default(VENDOR)
+  phone         String?
+  country       String?
+  image_key     String?
+  created_at    DateTime        @default(now())
+  logs          ActivityLog[]
+  approvals     Approval[]
+  notifications Notification[]
+  rfqs          RFQ[]           @relation("CreatedBy")
+  refreshTokens RefreshToken[]
+  vendorNotes   VendorNote[]
 }
 
 model Vendor {
@@ -84,18 +109,21 @@ model VendorNote {
 }
 
 model RFQ {
-  id             String           @id @default(uuid())
-  title          String
-  description    String
-  deadline       DateTime
-  status         String
-  created_by     String
-  pos            PurchaseOrder[]
-  quotations     Quotation[]
-  creator        User             @relation("CreatedBy", fields: [created_by], references: [id])
-  items          RFQ_Item[]
-  vendors        RFQ_Vendor[]
-  rfqAttachments RFQ_Attachment[]
+  id               String           @id @default(uuid())
+  reference_number String           @unique
+  title            String
+  description      String
+  deadline         DateTime
+  status           RFQStatus        @default(DRAFT)
+  created_by       String
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  pos              PurchaseOrder[]
+  quotations       Quotation[]
+  creator          User             @relation("CreatedBy", fields: [created_by], references: [id])
+  items            RFQ_Item[]
+  vendors          RFQ_Vendor[]
+  rfqAttachments   RFQ_Attachment[]
 }
 
 model RFQ_Item {
@@ -159,35 +187,70 @@ model Quotation_Item {
 }
 
 model Approval {
-  id           String    @id @default(uuid())
+  id           String         @id @default(uuid())
   quotation_id String
   approver_id  String
-  status       String
-  remarks      String?
-  decided_at   DateTime  @default(now())
-  approver     User      @relation(fields: [approver_id], references: [id])
-  quotation    Quotation @relation(fields: [quotation_id], references: [id])
+  status       ApprovalStatus @default(PENDING)
+  level        Int            @default(1)   // 1 = first approver, 2 = second, etc.
+  remarks      String?                      // mandatory on APPROVED or REJECTED
+  created_at   DateTime       @default(now())
+  decided_at   DateTime?                    // null until a decision is made
+  approver     User           @relation(fields: [approver_id], references: [id])
+  quotation    Quotation      @relation(fields: [quotation_id], references: [id], onDelete: Cascade)
 }
 
 model PurchaseOrder {
   id           String    @id @default(uuid())
+  po_number    String    @unique           // auto-generated: PO-YYYYMMDD-XXXX
   rfq_id       String
   quotation_id String
-  po_number    String    @unique
-  status       String
+  vendor_id    String                      // denormalized for fast lookup
+  created_by   String                      // user who created the PO
+  status       POStatus  @default(DRAFT)
+  gst_rate     Decimal   @default(18)      // GST % applied to all items
+  subtotal     Decimal   @default(0)       // sum of unit_price × quantity
+  tax_amount   Decimal   @default(0)       // subtotal × gst_rate / 100
+  grand_total  Decimal   @default(0)       // subtotal + tax_amount
+  notes        String?
+  terms        String?                     // payment terms e.g. "Net 30"
+  issued_at    DateTime?                   // set when status → ISSUED
   created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  items        PO_Item[]
   invoices     Invoice[]
   quotation    Quotation @relation(fields: [quotation_id], references: [id])
   rfq          RFQ       @relation(fields: [rfq_id], references: [id])
 }
 
+model PO_Item {
+  id           String        @id @default(uuid())
+  po_id        String
+  po           PurchaseOrder @relation(fields: [po_id], references: [id], onDelete: Cascade)
+  product_name String
+  description  String?
+  quantity     Int
+  unit         String
+  unit_price   Decimal
+  gst_rate     Decimal       @default(18)  // item-level rate (can differ from PO)
+  tax_amount   Decimal       @default(0)
+  total        Decimal       @default(0)   // (unit_price × quantity) + tax_amount
+}
+
 model Invoice {
   id             String        @id @default(uuid())
+  invoice_number String        @unique       // auto-generated: INV-YYYYMMDD-XXXX
   po_id          String
-  invoice_number String        @unique
-  tax_amount     Decimal
-  total          Decimal
-  status         String
+  status         InvoiceStatus @default(DRAFT)
+  invoice_date   DateTime      @default(now())
+  due_date       DateTime?                   // set on creation, e.g. +30 days
+  subtotal       Decimal       @default(0)
+  tax_amount     Decimal       @default(0)
+  grand_total    Decimal       @default(0)
+  notes          String?
+  paid_at        DateTime?                   // set when status → PAID
+  email_sent_at  DateTime?                   // set when invoice emailed to vendor
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
   po             PurchaseOrder @relation(fields: [po_id], references: [id])
 }
 
@@ -202,12 +265,16 @@ model ActivityLog {
 }
 
 model Notification {
-  id         String   @id @default(uuid())
-  user_id    String
-  message    String
-  read       Boolean  @default(false)
-  created_at DateTime @default(now())
-  user       User     @relation(fields: [user_id], references: [id])
+  id          String   @id @default(uuid())
+  user_id     String
+  type        String   @default("INFO")  // APPROVAL_REQUESTED, APPROVED, REJECTED, ESCALATED, INFO
+  title       String
+  message     String
+  entity_type String?  // e.g. "Approval", "Quotation"
+  entity_id   String?  // FK-like reference (not enforced at DB level)
+  read        Boolean  @default(false)
+  created_at  DateTime @default(now())
+  user        User     @relation(fields: [user_id], references: [id])
 }
 
 model RefreshToken {

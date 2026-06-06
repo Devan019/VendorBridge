@@ -15,16 +15,19 @@ export const sendMail = async ({
   to,
   subject,
   html,
+  attachments,
 }: {
   from: string;
   to: string;
   subject: string;
   html: string;
+  attachments?: any[];
 }) => {
   await transporter.sendMail({
     from,
     to,
     subject,
     html,
+    attachments,
   });
 };

@@ -11,8 +11,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { api } from '@/lib/api';
-import { useAuthStore } from '@/store/useAuthStore';
+import axios_api from '@/lib/axios_api';
+import { useAuth } from '@/context/AuthContext';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -23,7 +23,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const setUser = useAuthStore((state) => state.setUser);
+  const { setUser } = useAuth();
   const [serverError, setServerError] = useState('');
 
   const {
@@ -37,7 +37,7 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     try {
       setServerError('');
-      const res = await api.post('/auth/login', data);
+      const res = await axios_api.post('/auth/login', data);
       setUser(res.data.user);
       router.push('/dashboard');
     } catch (err: any) {

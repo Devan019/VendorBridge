@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useAuthStore } from '@/store/useAuthStore';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '../ui/Button';
 import { useRouter } from 'next/navigation';
 
 export function Navbar() {
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated, logout } = useAuth();
   const router = useRouter();
 
   const handleLogout = () => {

@@ -3,7 +3,7 @@ import fs from "fs/promises";
 import jwt from "jsonwebtoken";
 import prisma from "../utils/prisma";
 import { ACCESS_KEY, ACCESS_TOKEN_MAX_AGE_MS, REFRESH_KEY, REFRESH_TOKEN_MAX_AGE_MS, RESET_TOKEN_MAX_AGE_MS, S3_PUBLIC_BUCKET } from "../env_var";
-import { uploadFileToS3, generateSignedUrl } from "../utils/s3";
+import { uploadBufferToS3, generateSignedUrl } from "../utils/s3";
 import { UserRole } from "../generated/prisma/enums";
 import type { SignupInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from "./zod_shcema";
 
@@ -69,6 +69,7 @@ async function buildUserPayload(user: {
   id: string;
   first_name: string;
   last_name: string;
+  name: string;
   email: string;
   role: UserRole;
   phone?: string | null;
@@ -84,7 +85,7 @@ async function buildUserPayload(user: {
     id: user.id,
     first_name: user.first_name,
     last_name: user.last_name,
-    name: `${user.first_name} ${user.last_name}`.trim(),
+    name: user.name || `${user.first_name} ${user.last_name}`.trim(),
     email: user.email,
     role: user.role,
     phone: user.phone ?? null,
@@ -118,14 +119,14 @@ async function persistRefreshToken(userId: string, sessionId: string, token: str
   });
 }
 
-async function uploadProfileImage(filePath: string, mimeType: string): Promise<string> {
+async function uploadProfileImage(buffer: Buffer, mimeType: string): Promise<string> {
   if (!S3_PUBLIC_BUCKET) {
     throw new AuthError(500, "S3_PUBLIC_BUCKET is not configured");
   }
 
-  const uploaded = await uploadFileToS3({
+  const uploaded = await uploadBufferToS3({
     prefix: "users/profile-images",
-    filePath,
+    buffer,
     contentType: mimeType,
     Bucket: S3_PUBLIC_BUCKET,
   });
@@ -163,15 +164,17 @@ export async function signupService(input: SignupInput, file?: Express.Multer.Fi
     throw new AuthError(409, "A user with this email already exists");
   }
 
-  const imageKey = file?.path ? await uploadProfileImage(file.path, file.mimetype) : null;
+  const imageKey = file?.buffer ? await uploadProfileImage(file.buffer, file.mimetype) : null;
 
   console.log(imageKey)
 
   try {
+    const name = `${input.first_name.trim()} ${input.last_name.trim()}`.trim();
     const user = await prisma.user.create({
       data: {
         first_name: input.first_name.trim(),
         last_name: input.last_name.trim(),
+        name,
         email: input.email.toLowerCase().trim(),
         password_hash: hashPassword(input.password),
         role: input.role,
@@ -184,9 +187,7 @@ export async function signupService(input: SignupInput, file?: Express.Multer.Fi
 
     return createAuthSession(await buildUserPayload(user), crypto.randomUUID());
   } finally {
-    if (file?.path) {
-      await fs.unlink(file.path).catch(() => undefined);
-    }
+    // No local files to unlink when using memory storage
   }
 }
 

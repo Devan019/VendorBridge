@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import { RFQStatus } from '../generated/prisma/enums';
 import prisma from '../utils/prisma';
-import fs from 'fs';
-import path from 'path';
+import { logActivity } from '../utils/activityLog';
+import { uploadBufferToS3, deleteFileFromS3 } from '../utils/s3';
+import { S3_PUBLIC_BUCKET } from '../env_var';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -88,7 +89,7 @@ export async function listRFQs(req: Request, res: Response): Promise<void> {
           id: true, reference_number: true, title: true, description: true,
           deadline: true, status: true, created_at: true, updated_at: true,
           creator: { select: { id: true, name: true, email: true } },
-          _count: { select: { items: true, vendors: true, attachments: true, quotations: true } },
+          _count: { select: { items: true, vendors: true, rfqAttachments: true, quotations: true } },
         },
       }),
       prisma.rFQ.count({ where }),
@@ -192,9 +193,11 @@ export async function createRFQ(req: Request, res: Response): Promise<void> {
         items: true,
         vendors: { include: { vendor: { select: { id: true, name: true, category: true, status: true } } } },
         creator: { select: { id: true, name: true, email: true } },
-        _count: { select: { attachments: true, quotations: true } },
+        _count: { select: { rfqAttachments: true, quotations: true } },
       },
     });
+
+    await logActivity('RFQ', rfq.id, 'CREATED', rfq.created_by);
 
     res.status(201).json({ data: rfq });
   } catch (err: unknown) {
@@ -217,7 +220,7 @@ export async function getRFQ(req: Request, res: Response): Promise<void> {
       where: { id },
       include: {
         items: true,
-        attachments: true,
+        rfqAttachments: true,
         vendors: { include: { vendor: { select: { id: true, name: true, category: true, gst_number: true, contact_email: true, status: true } } } },
         creator: { select: { id: true, name: true, email: true } },
         _count: { select: { quotations: true } },
@@ -260,6 +263,7 @@ export async function updateRFQ(req: Request, res: Response): Promise<void> {
     if (deadline !== undefined) data.deadline = new Date(deadline);
 
     const updated = await prisma.rFQ.update({ where: { id }, data });
+    await logActivity('RFQ', updated.id, 'UPDATED', req.user?.id || existing.created_by);
     res.json({ data: updated });
   } catch (err) {
     console.error('[updateRFQ]', err);
@@ -293,6 +297,7 @@ export async function updateRFQStatus(req: Request, res: Response): Promise<void
     }
 
     const updated = await prisma.rFQ.update({ where: { id }, data: { status: newStatus } });
+    await logActivity('RFQ', updated.id, `STATUS_CHANGED:${newStatus}`, req.user?.id || existing.created_by);
     res.json({ data: updated });
   } catch (err) {
     console.error('[updateRFQStatus]', err);
@@ -317,12 +322,12 @@ export async function deleteRFQ(req: Request, res: Response): Promise<void> {
       res.status(409).json({ error: 'Only DRAFT RFQs can be deleted.' }); return;
     }
 
-    // Remove uploaded files from disk before DB delete
     for (const att of existing.rfqAttachments) {
-      if (fs.existsSync(att.path)) fs.unlinkSync(att.path);
+      await deleteFileFromS3(att.path, S3_PUBLIC_BUCKET || 'public');
     }
 
     await prisma.rFQ.delete({ where: { id } });
+    await logActivity('RFQ', id, 'DELETED', req.user?.id || existing.created_by);
     res.json({ message: 'RFQ deleted.' });
   } catch (err) {
     console.error('[deleteRFQ]', err);
@@ -511,28 +516,36 @@ export async function uploadAttachment(req: Request, res: Response): Promise<voi
 
     const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { id: true, status: true } });
     if (!rfq) {
-      // Remove uploaded file if RFQ doesn't exist
-      if (req.file) fs.unlinkSync(req.file.path);
       res.status(404).json({ error: 'RFQ not found.' }); return;
     }
 
     if (!req.file) { res.status(400).json({ error: 'No file uploaded. Use field name "file".' }); return; }
 
+    const uploaded = await uploadBufferToS3({
+      prefix: `rfq-attachments/${rfqId}`,
+      buffer: req.file.buffer,
+      contentType: req.file.mimetype,
+      Bucket: S3_PUBLIC_BUCKET || 'public',
+    });
+
+    if (!uploaded?.Key) {
+      res.status(500).json({ error: 'Failed to upload attachment to S3.' }); return;
+    }
+
     const attachment = await prisma.rFQ_Attachment.create({
       data: {
         rfq_id: rfqId,
-        filename: req.file.filename,
+        filename: req.file.originalname,
         original_name: req.file.originalname,
         mime_type: req.file.mimetype,
         size_bytes: req.file.size,
-        path: req.file.path,
+        path: uploaded.Key,
       },
     });
 
     res.status(201).json({ data: attachment });
   } catch (err) {
     console.error('[uploadAttachment]', err);
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ error: 'Failed to save attachment.' });
   }
 }
@@ -550,8 +563,8 @@ export async function deleteAttachment(req: Request, res: Response): Promise<voi
     });
     if (!attachment) { res.status(404).json({ error: 'Attachment not found.' }); return; }
 
-    // Delete file from disk
-    if (fs.existsSync(attachment.path)) fs.unlinkSync(attachment.path);
+    // Delete file from S3
+    await deleteFileFromS3(attachment.path, S3_PUBLIC_BUCKET || 'public');
 
     await prisma.rFQ_Attachment.delete({ where: { id: attachmentId } });
     res.json({ message: 'Attachment deleted.' });
