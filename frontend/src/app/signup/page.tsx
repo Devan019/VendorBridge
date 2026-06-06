@@ -11,16 +11,14 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { FrontendRoutes } from '@/constants/frontend_route';
 import axios_api from '@/lib/axios_api';
 import { useAuth } from '@/context/AuthContext';
-import { extractApiError } from '@/lib/utils';
 
 const signupSchema = z.object({
   first_name: z.string().min(2, 'First name is required'),
   last_name: z.string().min(2, 'Last name is required'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   role: z.enum(['ADMIN', 'MANAGER', 'PROCUREMENT_OFFICER', 'VENDOR']),
   phone: z.string().optional(),
   country: z.string().optional(),
@@ -69,10 +67,10 @@ export default function SignupPage() {
           'Content-Type': 'multipart/form-data',
         },
       });
-      setUser(res.data.DATA.user);
-      router.push(FrontendRoutes.DASHBOARD);
+      setUser(res.data.user);
+      router.push('/dashboard');
     } catch (err: any) {
-      setServerError(extractApiError(err, 'Signup failed. Please try again.'));
+      setServerError(err.response?.data?.message || 'Signup failed. Please try again.');
     }
   };
 
@@ -201,7 +199,7 @@ export default function SignupPage() {
 
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">Already have an account? </span>
-              <Link href={FrontendRoutes.LOGIN} className="font-medium text-primary hover:underline">
+              <Link href="/login" className="font-medium text-primary hover:underline">
                 Log in
               </Link>
             </div>

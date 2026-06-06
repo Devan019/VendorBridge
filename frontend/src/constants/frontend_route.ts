@@ -8,4 +8,10 @@ export const FrontendRoutes = {
     RESET_PASSWORD: "/reset-password",
     RFQS: "/dashboard/rfqs",
     NEW_RFQ: "/dashboard/rfqs/new",
+    QUOTATIONS: "/dashboard/quotations",
+    APPROVALS: "/dashboard/approvals",
+    PURCHASE_ORDERS: "/dashboard/purchase-orders",
+    INVOICES: "/dashboard/invoices",
+    REPORTS: "/dashboard/reports",
+    ACTIVITY: "/dashboard/activity",
 }

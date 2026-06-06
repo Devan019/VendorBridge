@@ -7,8 +7,9 @@ import { rfqApi, RFQItem, RFQStatus } from '@/lib/api/rfq';
 import { vendorApi, Vendor } from '@/lib/api/vendor';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { FrontendRoutes } from '@/constants/frontend_route';
+import { FormError } from '@/components/ui/FormError';
 import { Trash2, Plus, UploadCloud, X, Play } from 'lucide-react';
+import { FrontendRoutes } from '@/constants/frontend_route';
 
 export default function NewRFQPage() {
   const router = useRouter();
@@ -136,11 +137,7 @@ export default function NewRFQPage() {
         <p className="text-muted-foreground mt-1 text-sm tracking-wide lowercase">new request for quotation</p>
       </div>
 
-      {error && (
-        <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-lg mb-6">
-          {error}
-        </div>
-      )}
+      <FormError error={error} className="mb-6" />
 
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 max-w-5xl mx-auto">

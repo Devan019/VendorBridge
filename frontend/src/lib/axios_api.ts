@@ -1,6 +1,8 @@
 import { BASE_URL, refreshTokenRoute } from '@/constants/backend_routes';
 import axios from 'axios';
 
+import toast from 'react-hot-toast';
+
 const axios_api = axios.create({
   baseURL: BASE_URL + '/api',
   withCredentials: true,
@@ -63,6 +65,20 @@ axios_api.interceptors.response.use(
         // Unlock the door
         isRefreshing = false;
       }
+    }
+
+    // Global Error Toast Handler
+    // Only toast if it's NOT a 401 (which we handle) and it's not explicitly disabled
+    if (error.response && error.response.status !== 401) {
+      const errorMessage = error.response.data?.ERROR || error.response.data?.MESSAGE || error.message || 'An unexpected error occurred';
+      
+      // If errorMessage is an array of strings (validation errors), join them or just show the first one
+      const displayMessage = Array.isArray(errorMessage) ? errorMessage[0] : errorMessage;
+      
+      toast.error(displayMessage);
+    } else if (!error.response) {
+      // Network error or server down
+      toast.error('Network error. Please check your connection.');
     }
 
     //back to error if it's not the specific error we are looking for

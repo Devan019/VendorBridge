@@ -3,7 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import QueryProvider from '@/components/providers/QueryProvider';
 import { AuthProvider } from '@/context/AuthContext';
-
+import { Toaster } from 'react-hot-toast';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
@@ -17,10 +17,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <QueryProvider>
           <AuthProvider>
+            <Toaster position="top-right" />
             {children}
           </AuthProvider>
         </QueryProvider>
