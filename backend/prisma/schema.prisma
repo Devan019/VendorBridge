@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -12,7 +10,21 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
+enum VendorStatus {
+  ACTIVE
+  INACTIVE
+  BLACKLISTED
+}
+
+enum RFQStatus {
+  DRAFT
+  SENT
+  CLOSED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
   id            String         @id @default(uuid())
@@ -25,47 +37,82 @@ model User {
   approvals     Approval[]
   notifications Notification[]
   logs          ActivityLog[]
+  vendorNotes   VendorNote[]
 }
 
 model Vendor {
   id            String       @id @default(uuid())
   name          String
   category      String
+  tags          String[]     @default([])
   gst_number    String       @unique
   contact_email String
-  status        String
+  phone         String?
+  address       String?
+  status        VendorStatus @default(ACTIVE)
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
   rfqs          RFQ_Vendor[]
   quotations    Quotation[]
+  notes         VendorNote[]
+}
+
+model VendorNote {
+  id         String   @id @default(uuid())
+  vendor_id  String
+  vendor     Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+  author_id  String?
+  author     User?    @relation(fields: [author_id], references: [id])
+  content    String
+  created_at DateTime @default(now())
 }
 
 model RFQ {
-  id           String       @id @default(uuid())
-  title        String
-  description  String
-  deadline     DateTime
-  status       String
-  created_by   String
-  creator      User         @relation("CreatedBy", fields: [created_by], references: [id])
-  items        RFQ_Item[]
-  vendors      RFQ_Vendor[]
-  quotations   Quotation[]
-  pos          PurchaseOrder[]
+  id               String           @id @default(uuid())
+  reference_number String           @unique
+  title            String
+  description      String
+  deadline         DateTime
+  status           RFQStatus        @default(DRAFT)
+  created_by       String
+  creator          User             @relation("CreatedBy", fields: [created_by], references: [id])
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  items            RFQ_Item[]
+  vendors          RFQ_Vendor[]
+  attachments      RFQ_Attachment[]
+  quotations       Quotation[]
+  pos              PurchaseOrder[]
 }
 
 model RFQ_Item {
-  id         String            @id @default(uuid())
-  rfq_id     String
-  rfq        RFQ               @relation(fields: [rfq_id], references: [id])
+  id           String           @id @default(uuid())
+  rfq_id       String
+  rfq          RFQ              @relation(fields: [rfq_id], references: [id], onDelete: Cascade)
   product_name String
-  quantity   Int
-  unit       String
-  q_items    Quotation_Item[]
+  description  String?
+  quantity     Int
+  unit         String
+  unit_price   Decimal?         // optional budget reference price
+  q_items      Quotation_Item[]
+}
+
+model RFQ_Attachment {
+  id           String   @id @default(uuid())
+  rfq_id       String
+  rfq          RFQ      @relation(fields: [rfq_id], references: [id], onDelete: Cascade)
+  filename     String
+  original_name String
+  mime_type    String
+  size_bytes   Int
+  path         String
+  uploaded_at  DateTime @default(now())
 }
 
 model RFQ_Vendor {
   rfq_id    String
   vendor_id String
-  rfq       RFQ    @relation(fields: [rfq_id], references: [id])
+  rfq       RFQ    @relation(fields: [rfq_id], references: [id], onDelete: Cascade)
   vendor    Vendor @relation(fields: [vendor_id], references: [id])
 
   @@id([rfq_id, vendor_id])
@@ -128,13 +175,13 @@ model Invoice {
 }
 
 model ActivityLog {
-  id            String   @id @default(uuid())
-  entity_type   String
-  entity_id     String
-  action        String
-  performed_by  String
-  user          User     @relation(fields: [performed_by], references: [id])
-  timestamp     DateTime @default(now())
+  id           String   @id @default(uuid())
+  entity_type  String
+  entity_id    String
+  action       String
+  performed_by String
+  user         User     @relation(fields: [performed_by], references: [id])
+  timestamp    DateTime @default(now())
 }
 
 model Notification {
