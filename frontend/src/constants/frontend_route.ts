@@ -6,4 +6,10 @@ export const FrontendRoutes = {
     VENDORS: "/dashboard/vendors",
     FORGOT_PASSWORD: "/forgot-password",
     RESET_PASSWORD: "/reset-password",
+    QUOTATIONS: "/dashboard/quotations",
+    APPROVALS: "/dashboard/approvals",
+    PURCHASE_ORDERS: "/dashboard/purchase-orders",
+    INVOICES: "/dashboard/invoices",
+    REPORTS: "/dashboard/reports",
+    ACTIVITY: "/dashboard/activity",
 }
