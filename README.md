@@ -6,7 +6,8 @@ VendorBridge is a comprehensive role-based B2B Vendor Management and Procurement
 - **Frontend**: Next.js 14, React, Tailwind CSS, Framer Motion, React Query, Axios, Shadcn UI
 - **Backend**: Node.js, Express, TypeScript, Zod
 - **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: JWT-based Authentication (Access & Refresh tokens via cookies)
+- **Storage & CDN**: Cloudflare R2 for secure, lightning-fast uploaded file storage and global CDN optimization
+- **Authentication**: Secure JWT-based Authentication using HTTP-only cookies with rotating Access & Refresh tokens, plus full Forgot/Reset Password flows
 
 ## 👥 Role-Based Access Control (RBAC)
 The platform offers 4 primary roles:
@@ -15,9 +16,27 @@ The platform offers 4 primary roles:
 3. **Procurement Officer**: Creates RFQs, invites vendors, reviews incoming quotations, generates POs.
 4. **Vendor**: Submits quotations for RFQs, tracks order status, submits invoices.
 
+## 🗄️ Database Schema
+![Database Schema Diagram](./db.png)
+
 ## 📁 Project Structure
 - `/frontend`: Next.js web application.
 - `/backend`: Express.js backend API and Prisma database schemas.
+
+## ✨ Key Features & Enhancements
+
+### ☁️ Cloudflare R2 Integration & CDN Optimization
+VendorBridge leverages **Cloudflare R2** for all file storage (RFQ attachments, vendor documents, and profile pictures). This provides:
+- **Zero Egress Fees**: Cost-effective storage scaling for heavy procurement documents.
+- **Global CDN**: Uploaded assets are served via Cloudflare's edge network, ensuring lightning-fast load times for vendors and officers globally.
+- **Secure Access**: Private buckets with signed URLs for sensitive procurement documents.
+
+### 🔐 Advanced Authentication
+The authentication system is built for enterprise-grade security:
+- **Dual-Token Architecture**: Uses short-lived Access Tokens and long-lived Refresh Tokens.
+- **HTTP-Only Cookies**: Tokens are securely stored in HTTP-only, SameSite cookies to prevent XSS and CSRF attacks.
+- **Seamless Refresh**: The frontend Axios interceptor automatically catches 401 Unauthorized errors and silently refreshes the access token in the background without interrupting the user experience.
+- **Account Recovery**: Complete Forgot & Reset Password workflow using secure, time-boxed reset tokens.
 
 ## 🌐 Application Architecture & Flows
 1. **Vendor Registration**: Admins or Procurement Officers register Vendors. Vendors can also be invited to register.
