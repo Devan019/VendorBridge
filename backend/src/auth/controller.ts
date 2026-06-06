@@ -101,15 +101,18 @@ export const refreshTokenController = expressAsyncHandler(async (req: Request, r
 
 export const revokeToken = expressAsyncHandler(async (req: Request, res: Response) => {
   const { refresh_token } = req.cookies;
-  if (!refresh_token) {
-    clearAuthCookies(res);
-    return formatResponse(res, 401, "Unauthorized", false, null);
+
+  if (refresh_token) {
+    // Best-effort: delete from DB. If token is already expired/not found, still log out.
+    try {
+      await revokeRefreshToken(refresh_token);
+    } catch {
+      // Token already invalid — still clear cookies and return success
+    }
   }
 
-  await revokeRefreshToken(refresh_token);
   clearAuthCookies(res);
-
-  return formatResponse(res, 200, "Session revoked successfully", true, null);
+  return formatResponse(res, 200, "Logged out successfully", true, null);
 });
 
 export const forgotPassword = expressAsyncHandler(async (req: Request, res: Response) => {

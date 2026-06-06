@@ -19,7 +19,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   setUser: (user: User | null) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,10 +52,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     SetIsAuthenticated(true);
   };
 
-  const logout = () => {
-    SetIsAuthenticated(false);  
-    setUserState(null);
-    axios_api.post('/auth/revoke-token').catch(() => {});
+  const logout = async () => {
+    // Best-effort: tell the server to delete the refresh token from DB + clear its cookies.
+    // We always clear local state afterwards regardless of whether the server call succeeds.
+    try {
+      await axios_api.post('/auth/logout');
+    } catch {
+      // Server-side revoke failed (e.g. already expired). Still clear local state.
+    } finally {
+      SetIsAuthenticated(false);
+      setUserState(null);
+    }
   };
 
   return (

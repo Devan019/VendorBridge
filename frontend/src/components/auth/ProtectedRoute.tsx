@@ -32,6 +32,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   const isAllowed = hasAccess(user.role as Role, pathname);
 
+  const roleLabel: Record<string, string> = {
+    ADMIN: 'Admin',
+    MANAGER: 'Manager',
+    PROCUREMENT_OFFICER: 'Procurement Officer',
+    VENDOR: 'Vendor',
+  };
+
   if (!isAllowed) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-4 text-center">
@@ -39,10 +46,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
           <ShieldAlert className="w-16 h-16 text-destructive" />
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">Access Denied</h1>
-        <p className="text-muted-foreground max-w-md mb-8">
-          You do not have permission to view this page. If you believe this is an error, please contact your administrator.
+        <p className="text-muted-foreground max-w-md mb-2">
+          Your role <span className="font-semibold text-foreground">{roleLabel[user.role] ?? user.role}</span> does not have permission to view this page.
         </p>
-        <button 
+        <p className="text-sm text-muted-foreground max-w-md mb-8">
+          If you believe this is an error, please contact your administrator.
+        </p>
+        <button
           onClick={() => router.push(FrontendRoutes.DASHBOARD)}
           className="px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
         >

@@ -12,6 +12,7 @@ import approvalRoutes, { getApprovalTimeline } from './approval/route';
 import notificationRoutes, { logRouter } from './notification/route';
 import { poRoutes, invoiceRoutes } from './po/route';
 import analyticsRoutes from './analytics/route';
+import adminRoutes from './admin/route';
 
 const app: Application = express();
 const PORT: number = Number(process.env.PORT) || 4000;
@@ -69,6 +70,7 @@ app.use('/api/logs', logRouter);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/pos', poRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/admin', adminRoutes);
 // Nested: GET /api/rfqs/:rfqId/quotations
 app.get('/api/rfqs/:rfqId/quotations', listRFQQuotations);
 // Nested: GET|POST /api/rfqs/:rfqId/compare[/select]
