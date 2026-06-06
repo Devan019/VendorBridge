@@ -116,7 +116,7 @@ export default function QuotationComparisonPage() {
                 </div>
                 <div className="h-20 flex items-center justify-center px-4">
                   <Button 
-                    variant={isLowest ? 'default' : 'outline'}
+                    variant={isLowest ? 'primary' : 'outline'}
                     className={`w-full ${isLowest ? 'bg-[#18792b] hover:bg-[#115a1e] text-white shadow-sm border border-[#0f451a]/50' : 'border-input bg-transparent hover:bg-secondary/50'}`}
                     onClick={() => selectMutation.mutate(vendor.quotation_id)}
                     disabled={selectMutation.isPending}

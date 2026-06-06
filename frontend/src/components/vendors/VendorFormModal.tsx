@@ -17,7 +17,7 @@ const vendorSchema = z.object({
   contact_email: z.string().email('Invalid email address'),
   phone: z.string().optional(),
   address: z.string().optional(),
-  status: z.enum(["ACTIVE", "INACTIVE", "BLACKLISTED"]).default("ACTIVE"),
+  status: z.enum(["ACTIVE", "INACTIVE", "BLACKLISTED"]),
 });
 
 type VendorFormValues = z.infer<typeof vendorSchema>;

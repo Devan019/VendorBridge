@@ -63,7 +63,7 @@ export default function QuotationsPage() {
   const subtotal = useMemo(() => {
     if (!rfq?.items) return 0;
     return rfq.items.reduce((sum, item) => {
-      const input = itemInputs[item.id] || { price: 0, days: 0 };
+      const input = itemInputs[item.id as string] || { price: 0, days: 0 };
       return sum + (input.price * item.quantity);
     }, 0);
   }, [rfq, itemInputs]);
@@ -84,17 +84,17 @@ export default function QuotationsPage() {
 
   const handleSubmit = () => {
     const activeVendor = selectedVendorId || vendors[0]?.id;
-    if (!rfq || !activeVendor) {
-      alert("Missing RFQ or Vendor data to submit.");
+    if (!rfq || !activeVendor || !rfq.items) {
+      alert("Missing RFQ, items, or Vendor data to submit.");
       return;
     }
     
     const payloadItems = rfq.items.map(item => {
-      const input = itemInputs[item.id];
+      const input = itemInputs[item.id as string];
       const price = input?.price || 0;
       const days = input?.days || 7;
       return {
-        rfq_item_id: item.id,
+        rfq_item_id: item.id as string,
         unit_price: Math.max(0, price),
         delivery_days: days < 1 ? 7 : days,
         notes: ""
@@ -172,7 +172,7 @@ export default function QuotationsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {rfq.items.map(item => {
-                const input = itemInputs[item.id] || { price: 0, days: 0 };
+                const input = itemInputs[item.id as string] || { price: 0, days: 0 };
                 const itemTotal = item.quantity * input.price;
                 return (
                   <tr key={item.id} className="hover:bg-secondary/20 transition-colors">
@@ -183,7 +183,7 @@ export default function QuotationsPage() {
                         type="number"
                         min="0"
                         value={input.price || ''}
-                        onChange={(e) => handleInputChange(item.id, 'price', e.target.value)}
+                        onChange={(e) => handleInputChange(item.id as string, 'price', e.target.value)}
                         placeholder="0.00"
                         className="h-8 text-right bg-transparent border-transparent hover:border-input focus:border-input" 
                       />
@@ -196,7 +196,7 @@ export default function QuotationsPage() {
                         type="number"
                         min="1"
                         value={input.days || ''}
-                        onChange={(e) => handleInputChange(item.id, 'days', e.target.value)}
+                        onChange={(e) => handleInputChange(item.id as string, 'days', e.target.value)}
                         placeholder="Days"
                         className="h-8 text-center bg-transparent border-transparent hover:border-input focus:border-input" 
                       />
