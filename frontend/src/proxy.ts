@@ -11,7 +11,7 @@ export default function proxy(request: NextRequest) {
   const hasRefreshToken = request.cookies.has('refresh_token');
   
   // The user considers them authenticated if both tokens exist
-  const isAuthenticated = hasAccessToken && hasRefreshToken;
+  const isAuthenticated =  hasRefreshToken;
 
   // If trying to access login/signup while authenticated, redirect to dashboard
   if (isAuthenticated && authRoutes.includes(pathname)) {

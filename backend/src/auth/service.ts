@@ -65,7 +65,7 @@ function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-async function buildUserPayload(user: {
+export async function buildUserPayload(user: {
   id: string;
   first_name: string;
   last_name: string;

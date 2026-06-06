@@ -6,13 +6,19 @@ import { Button } from '../ui/Button';
 import { useRouter } from 'next/navigation';
 
 export function Navbar() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, isLoading } = useAuth();
   const router = useRouter();
 
   const handleLogout = () => {
     logout();
     router.push('/');
   };
+
+  if(isLoading) return (
+    <div>
+      
+    </div>
+  )
 
   return (
     <nav className="border-b bg-white/50 backdrop-blur-md sticky top-0 z-50">

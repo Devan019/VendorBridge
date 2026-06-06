@@ -1,8 +1,8 @@
-import { NextFunction, Request, Response } from "express";
+import { Request, Response } from "express";
 import expressAsyncHandler from "../utils/expressAsync";
 import { formatResponse } from "../utils/formateResponse";
-import { ACCESS_TOKEN_MAX_AGE_MS, ACCESS_KEY } from "../env_var";
-import jwt from "jsonwebtoken";
+import { ACCESS_TOKEN_MAX_AGE_MS } from "../env_var";
+import prisma from "../utils/prisma";
 import {
   forgotPasswordService,
   loginService,
@@ -10,6 +10,7 @@ import {
   resetPasswordService,
   revokeRefreshToken,
   signupService,
+  buildUserPayload,
 } from "./service";
 import { forgotPasswordSchema, loginSchema, resetPasswordSchema, signupSchema } from "./zod_shcema";
 
@@ -129,4 +130,21 @@ export const resetPassword = expressAsyncHandler(async (req: Request, res: Respo
 
   const result = await resetPasswordService(parsed.data);
   return formatResponse(res, 200, result.message, true, result);
+});
+
+export const getMe = expressAsyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    return formatResponse(res, 401, "Unauthorized", false, null);
+  }
+  
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id }
+  });
+
+  if (!user) {
+    return formatResponse(res, 404, "User not found", false, null);
+  }
+
+  const payload = await buildUserPayload(user);
+  return formatResponse(res, 200, "User fetched successfully", true, { user: payload });
 });
