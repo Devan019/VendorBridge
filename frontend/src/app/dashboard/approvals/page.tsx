@@ -36,7 +36,7 @@ export default function ApprovalPage() {
 
   // Mutations
   const approveMutation = useMutation({
-    mutationFn: () => approvalApi.approveApproval(currentApproval.id, { remarks }),
+    mutationFn: () => approvalApi.approveApproval(currentApproval.id, { remarks: remarks.trim() || 'Approved' }),
     onSuccess: () => {
       alert("Quotation Approved!");
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
@@ -49,7 +49,7 @@ export default function ApprovalPage() {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: () => approvalApi.rejectApproval(currentApproval.id, { remarks }),
+    mutationFn: () => approvalApi.rejectApproval(currentApproval.id, { remarks: remarks.trim() || 'Rejected' }),
     onSuccess: () => {
       alert("Quotation Rejected.");
       queryClient.invalidateQueries({ queryKey: ['approvals'] });

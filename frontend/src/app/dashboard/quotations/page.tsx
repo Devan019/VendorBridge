@@ -38,12 +38,14 @@ export default function QuotationsPage() {
 
   const rfq: RFQ | undefined = fullRfqData?.data;
 
-  // 2. Fetch a vendor ID to use (since auth doesn't strictly tie user->vendor in schema yet)
-  const { data: vendors } = useQuery({
+  // 2. Fetch vendors to allow selection
+  const { data: vendorsData } = useQuery({
     queryKey: ['vendors'],
     queryFn: () => vendorApi.listVendors()
   });
-  const vendorId = vendors?.data?.[0]?.id;
+  const vendors = vendorsData?.data || [];
+  
+  const [selectedVendorId, setSelectedVendorId] = useState<string>('');
 
   // 3. Mutation to submit the quotation
   const submitMutation = useMutation({
@@ -81,24 +83,27 @@ export default function QuotationsPage() {
   };
 
   const handleSubmit = () => {
-    if (!rfq || !vendorId) {
+    const activeVendor = selectedVendorId || vendors[0]?.id;
+    if (!rfq || !activeVendor) {
       alert("Missing RFQ or Vendor data to submit.");
       return;
     }
     
     const payloadItems = rfq.items.map(item => {
-      const input = itemInputs[item.id] || { price: 0, days: 7 };
+      const input = itemInputs[item.id];
+      const price = input?.price || 0;
+      const days = input?.days || 7;
       return {
         rfq_item_id: item.id,
-        unit_price: input.price,
-        delivery_days: input.days,
+        unit_price: Math.max(0, price),
+        delivery_days: days < 1 ? 7 : days,
         notes: ""
       };
     });
 
     submitMutation.mutate({
       rfq_id: rfq.id,
-      vendor_id: vendorId,
+      vendor_id: activeVendor,
       notes: notes,
       items: payloadItems
     });
@@ -124,13 +129,29 @@ export default function QuotationsPage() {
         </Button>
       </div>
 
-      {/* RFQ Summary Card */}
+      {/* RFQ Summary Card & Vendor Selection */}
       <Card className="shadow-sm border-border bg-card">
-        <CardContent className="p-4 flex flex-col justify-center">
-          <span className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-medium">RFQ Summary</span>
-          <p className="text-foreground">
-            {rfq.description} - Deadline: {new Date(rfq.deadline).toLocaleDateString()}
-          </p>
+        <CardContent className="p-4 flex flex-col justify-center space-y-4">
+          <div>
+            <span className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-medium">RFQ Summary</span>
+            <p className="text-foreground">
+              {rfq.description} - Deadline: {new Date(rfq.deadline).toLocaleDateString()}
+            </p>
+          </div>
+          <div>
+            <span className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-medium">Select Vendor (For Demo)</span>
+            <select 
+              className="mt-1 w-full max-w-sm rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
+              value={selectedVendorId}
+              onChange={(e) => setSelectedVendorId(e.target.value)}
+            >
+              <option value="">-- Select Vendor --</option>
+              {vendors.map((v: any) => (
+                <option key={v.id} value={v.id}>{v.name} (GST: {v.gst_number})</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">Pick a vendor that hasn't quoted yet to avoid 409 Conflict.</p>
+          </div>
         </CardContent>
       </Card>
 
