@@ -36,6 +36,13 @@ enum QuotationStatus {
   REJECTED
 }
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -164,14 +171,16 @@ model Quotation_Item {
 }
 
 model Approval {
-  id           String    @id @default(uuid())
+  id           String         @id @default(uuid())
   quotation_id String
   approver_id  String
-  status       String
-  remarks      String?
-  decided_at   DateTime  @default(now())
-  approver     User      @relation(fields: [approver_id], references: [id])
-  quotation    Quotation @relation(fields: [quotation_id], references: [id])
+  status       ApprovalStatus @default(PENDING)
+  level        Int            @default(1)   // 1 = first approver, 2 = second, etc.
+  remarks      String?                      // mandatory on APPROVED or REJECTED
+  created_at   DateTime       @default(now())
+  decided_at   DateTime?                    // null until a decision is made
+  approver     User           @relation(fields: [approver_id], references: [id])
+  quotation    Quotation      @relation(fields: [quotation_id], references: [id], onDelete: Cascade)
 }
 
 model PurchaseOrder {
@@ -207,12 +216,16 @@ model ActivityLog {
 }
 
 model Notification {
-  id         String   @id @default(uuid())
-  user_id    String
-  message    String
-  read       Boolean  @default(false)
-  created_at DateTime @default(now())
-  user       User     @relation(fields: [user_id], references: [id])
+  id          String   @id @default(uuid())
+  user_id     String
+  type        String   @default("INFO")  // APPROVAL_REQUESTED, APPROVED, REJECTED, ESCALATED, INFO
+  title       String
+  message     String
+  entity_type String?  // e.g. "Approval", "Quotation"
+  entity_id   String?  // FK-like reference (not enforced at DB level)
+  read        Boolean  @default(false)
+  created_at  DateTime @default(now())
+  user        User     @relation(fields: [user_id], references: [id])
 }
 
 model RefreshToken {

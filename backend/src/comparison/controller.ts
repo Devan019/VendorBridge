@@ -3,7 +3,7 @@ import expressAsyncHandler from "../utils/expressAsync";
 import { formatResponse } from "../utils/formateResponse";
 import { comparisonQuerySchema, selectQuotationSchema } from "./zod";
 import prisma from "../lib/prisma";
-import { QuotationStatus } from "../generated/prisma/enums";
+import { ApprovalStatus, QuotationStatus } from "../generated/prisma/enums";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -329,8 +329,9 @@ export const selectQuotation = expressAsyncHandler(
             data: {
               quotation_id: sibling.id,
               approver_id,
-              status:  QuotationStatus.ACCEPTED,
+              status:  ApprovalStatus.APPROVED,
               remarks: remarks ?? null,
+              decided_at: new Date(),
             },
           });
         } else if (
@@ -346,8 +347,9 @@ export const selectQuotation = expressAsyncHandler(
             data: {
               quotation_id: sibling.id,
               approver_id,
-              status:  QuotationStatus.REJECTED,
+              status:  ApprovalStatus.REJECTED,
               remarks: "Not selected during comparison",
+              decided_at: new Date(),
             },
           });
         }
