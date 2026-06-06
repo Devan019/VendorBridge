@@ -11,8 +11,11 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { FrontendRoutes } from '@/constants/frontend_route';
 import axios_api from '@/lib/axios_api';
 import { useAuth } from '@/context/AuthContext';
+import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
+import { extractApiError } from '@/lib/utils';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -25,6 +28,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { setUser } = useAuth();
   const [serverError, setServerError] = useState('');
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   const {
     register,
@@ -38,10 +42,10 @@ export default function LoginPage() {
     try {
       setServerError('');
       const res = await axios_api.post('/auth/login', data);
-      setUser(res.data.user);
-      router.push('/dashboard');
+      setUser(res.data.DATA.user);
+      router.push(FrontendRoutes.DASHBOARD);
     } catch (err: any) {
-      setServerError(err.response?.data?.message || 'Login failed. Please try again.');
+      setServerError(extractApiError(err, 'Login failed. Please try again.'));
     }
   };
 
@@ -76,7 +80,16 @@ export default function LoginPage() {
               </div>
               
               <div className="space-y-1">
-                <label className="text-sm font-medium leading-none">Password</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium leading-none">Password</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsForgotModalOpen(true)}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 <Input
                   {...register('password')}
                   type="password"
@@ -102,13 +115,18 @@ export default function LoginPage() {
 
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">Don't have an account? </span>
-              <Link href="/signup" className="font-medium text-primary hover:underline">
+              <Link href={FrontendRoutes.REGISTER} className="font-medium text-primary hover:underline">
                 Sign up
               </Link>
             </div>
           </CardContent>
         </Card>
       </motion.div>
+      
+      <ForgotPasswordModal 
+        isOpen={isForgotModalOpen} 
+        onClose={() => setIsForgotModalOpen(false)} 
+      />
     </div>
   );
 }

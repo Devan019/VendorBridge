@@ -11,8 +11,10 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { FrontendRoutes } from '@/constants/frontend_route';
 import axios_api from '@/lib/axios_api';
 import { useAuth } from '@/context/AuthContext';
+import { extractApiError } from '@/lib/utils';
 
 const signupSchema = z.object({
   first_name: z.string().min(2, 'First name is required'),
@@ -67,10 +69,10 @@ export default function SignupPage() {
           'Content-Type': 'multipart/form-data',
         },
       });
-      setUser(res.data.user);
-      router.push('/dashboard');
+      setUser(res.data.DATA.user);
+      router.push(FrontendRoutes.DASHBOARD);
     } catch (err: any) {
-      setServerError(err.response?.data?.message || 'Signup failed. Please try again.');
+      setServerError(extractApiError(err, 'Signup failed. Please try again.'));
     }
   };
 
@@ -199,7 +201,7 @@ export default function SignupPage() {
 
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">Already have an account? </span>
-              <Link href="/login" className="font-medium text-primary hover:underline">
+              <Link href={FrontendRoutes.LOGIN} className="font-medium text-primary hover:underline">
                 Log in
               </Link>
             </div>

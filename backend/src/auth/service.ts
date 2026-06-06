@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import prisma from "../utils/prisma";
 import { ACCESS_KEY, ACCESS_TOKEN_MAX_AGE_MS, REFRESH_KEY, REFRESH_TOKEN_MAX_AGE_MS, RESET_TOKEN_MAX_AGE_MS, S3_PUBLIC_BUCKET } from "../env_var";
 import { uploadBufferToS3, generateSignedUrl } from "../utils/s3";
+import { sendMail } from "../utils/SendMail";
 import { UserRole } from "../generated/prisma/enums";
 import type { SignupInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from "./zod_shcema";
 
@@ -340,10 +341,24 @@ export async function forgotPasswordService(input: ForgotPasswordInput): Promise
     },
   });
 
+  const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`; // Or just send the token
+  
+  await sendMail({
+    from: process.env.SMTP_USER || "vendorbridge@example.com",
+    to: input.email.toLowerCase().trim(),
+    subject: "VendorBridge - Password Reset",
+    html: `
+      <h2>Password Reset Request</h2>
+      <p>You requested to reset your password. Use the following token to reset it:</p>
+      <div style="padding: 10px; background-color: #f3f4f6; border-radius: 5px; font-family: monospace; font-size: 16px;">
+        ${resetToken}
+      </div>
+      <p>This token is valid for 15 minutes.</p>
+    `,
+  });
+
   return {
-    message: "Password reset token created",
-    reset_token: resetToken,
-    expires_at: expiresAt,
+    message: "Password reset instructions sent to email",
   };
 }
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '../ui/Button';
 import { useRouter } from 'next/navigation';
+import { FrontendRoutes } from '@/constants/frontend_route';
 
 export function Navbar() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
@@ -11,33 +12,41 @@ export function Navbar() {
 
   const handleLogout = () => {
     logout();
-    router.push('/');
+    router.push(FrontendRoutes.HOME);
   };
 
-  if(isLoading) return (
-    <div>
-      
-    </div>
-  )
+  if (isLoading) {
+    return (
+      <nav className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="h-8 w-32 bg-gray-200 animate-pulse rounded"></div>
+
+        <div className="flex gap-4">
+          <div className="h-8 w-20 bg-gray-200 animate-pulse rounded"></div>
+          <div className="h-8 w-20 bg-gray-200 animate-pulse rounded"></div>
+          <div className="h-8 w-20 bg-gray-200 animate-pulse rounded"></div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="border-b bg-white/50 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex-shrink-0 flex items-center">
-            <Link href="/" className="text-xl font-bold tracking-tight">
+            <Link href={FrontendRoutes.HOME} className="text-xl font-bold tracking-tight">
               Vendor<span className="text-gray-400">Bridge</span>
             </Link>
           </div>
-          
+
           <div className="flex items-center gap-4">
             {isAuthenticated ? (
               <>
                 <div className="flex items-center gap-2 mr-2">
                   {user?.image_url ? (
-                    <img 
-                      src={user.image_url} 
-                      alt="Profile" 
+                    <img
+                      src={user.image_url}
+                      alt="Profile"
                       className="w-8 h-8 rounded-full object-cover border"
                     />
                   ) : (
@@ -49,7 +58,7 @@ export function Navbar() {
                     {user?.first_name} {user?.last_name}
                   </span>
                 </div>
-                <Link href="/dashboard">
+                <Link href={FrontendRoutes.DASHBOARD}>
                   <Button variant="ghost" size="sm">Dashboard</Button>
                 </Link>
                 <Button variant="outline" size="sm" onClick={handleLogout}>
@@ -58,10 +67,10 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <Link href="/login">
+                <Link href={FrontendRoutes.LOGIN}>
                   <Button variant="ghost" size="sm">Log in</Button>
                 </Link>
-                <Link href="/signup">
+                <Link href={FrontendRoutes.REGISTER}>
                   <Button size="sm">Sign up</Button>
                 </Link>
               </>

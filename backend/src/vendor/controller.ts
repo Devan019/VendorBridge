@@ -173,7 +173,7 @@ export async function getVendor(req: Request, res: Response): Promise<void> {
     const vendor = await prisma.vendor.findUnique({
       where: { id },
       include: {
-        notes: {
+        vendorNotes: {
           orderBy: { created_at: 'desc' },
           include: { author: { select: { id: true, name: true, email: true } } },
         },

@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { FrontendRoutes } from '@/constants/frontend_route';
 
 export default function Home() {
   return (
@@ -34,7 +35,7 @@ export default function Home() {
         </p>
 
         <div className="flex items-center gap-4">
-          <Link href="/login">
+          <Link href={FrontendRoutes.LOGIN}>
             <motion.button 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -43,7 +44,7 @@ export default function Home() {
               Get Started
             </motion.button>
           </Link>
-          <Link href="/signup">
+          <Link href={FrontendRoutes.REGISTER}>
             <motion.button 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

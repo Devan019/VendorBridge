@@ -2,7 +2,7 @@ import { BASE_URL, refreshTokenRoute } from '@/constants/backend_routes';
 import axios from 'axios';
 
 const axios_api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: BASE_URL + '/api',
   withCredentials: true,
 });
 

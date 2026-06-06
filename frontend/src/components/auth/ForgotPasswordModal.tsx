@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import axios_api from '@/lib/axios_api';
+import { extractApiError } from '@/lib/utils';
 
 export function ForgotPasswordModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
@@ -21,12 +22,11 @@ export function ForgotPasswordModal({ isOpen, onClose }: { isOpen: boolean; onCl
     setError('');
     setSuccess('');
     try {
-      const res = await axios_api.post('/auth/forgot-password', { email });
-      setResetToken(res.data.data.reset_token); // Pre-fill token since email isn't actually sent in demo
+      await axios_api.post('/auth/forgot-password', { email });
       setStep(2);
-      setSuccess('Token generated! Proceed to reset password.');
+      setSuccess('Token sent to your email! Please check your inbox.');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to request password reset');
+      setError(extractApiError(err, 'Failed to request password reset'));
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: { isOpen: boolean; onCl
         setSuccess('');
       }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to reset password');
+      setError(extractApiError(err, 'Failed to reset password'));
     } finally {
       setLoading(false);
     }
@@ -103,7 +103,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: { isOpen: boolean; onCl
                     required
                     placeholder="Token"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Pre-filled for demonstration purposes</p>
+                  <p className="text-xs text-muted-foreground mt-1">Enter the token sent to your email</p>
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium">New Password</label>

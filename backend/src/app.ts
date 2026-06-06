@@ -58,7 +58,7 @@ app.get('/', (_req: Request, res: Response) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/auth', authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/rfqs', rfqRoutes);
 app.use('/api/quotations', quotationRoutes);
