@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { VendorStatus } from '../generated/prisma/enums';
-import prisma from '../lib/prisma';
+import prisma from '../utils/prisma';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

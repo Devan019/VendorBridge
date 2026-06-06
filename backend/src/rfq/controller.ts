@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { RFQStatus } from '../generated/prisma/enums';
-import prisma from '../lib/prisma';
+import prisma from '../utils/prisma';
 import fs from 'fs';
 import path from 'path';
 
@@ -35,8 +35,8 @@ function parseRFQStatus(raw: string | undefined): RFQStatus | undefined {
 
 /** Valid status transitions */
 const TRANSITIONS: Record<RFQStatus, RFQStatus[]> = {
-  DRAFT:  ['SENT'],
-  SENT:   ['CLOSED'],
+  DRAFT: ['SENT'],
+  SENT: ['CLOSED'],
   CLOSED: [],
 };
 
@@ -48,17 +48,17 @@ const TRANSITIONS: Record<RFQStatus, RFQStatus[]> = {
  */
 export async function listRFQs(req: Request, res: Response): Promise<void> {
   try {
-    const search     = qs(req.query.search);
-    const status     = qs(req.query.status);
+    const search = qs(req.query.search);
+    const status = qs(req.query.status);
     const created_by = qs(req.query.created_by);
-    const sortBy     = qs(req.query.sortBy, 'created_at');
-    const order      = qs(req.query.order, 'desc');
-    const page       = qs(req.query.page, '1');
-    const limit      = qs(req.query.limit, '20');
+    const sortBy = qs(req.query.sortBy, 'created_at');
+    const order = qs(req.query.order, 'desc');
+    const page = qs(req.query.page, '1');
+    const limit = qs(req.query.limit, '20');
 
-    const pageNum  = Math.max(1, parseInt(page, 10));
+    const pageNum = Math.max(1, parseInt(page, 10));
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
-    const skip     = (pageNum - 1) * limitNum;
+    const skip = (pageNum - 1) * limitNum;
 
     const allowed = { title: 1, status: 1, deadline: 1, created_at: 1, reference_number: 1 };
     const sortField = (allowed as Record<string, number>)[sortBy] ? sortBy : 'created_at';
@@ -67,9 +67,9 @@ export async function listRFQs(req: Request, res: Response): Promise<void> {
     const where: Record<string, unknown> = {};
     if (search.trim()) {
       where.OR = [
-        { title:            { contains: search.trim(), mode: 'insensitive' } },
+        { title: { contains: search.trim(), mode: 'insensitive' } },
         { reference_number: { contains: search.trim(), mode: 'insensitive' } },
-        { description:      { contains: search.trim(), mode: 'insensitive' } },
+        { description: { contains: search.trim(), mode: 'insensitive' } },
       ];
     }
     if (status) {
@@ -136,11 +136,11 @@ export async function createRFQ(req: Request, res: Response): Promise<void> {
 
     // Validation
     const errors: string[] = [];
-    if (!title?.trim())       errors.push('title is required.');
+    if (!title?.trim()) errors.push('title is required.');
     if (!description?.trim()) errors.push('description is required.');
-    if (!deadline)            errors.push('deadline is required.');
+    if (!deadline) errors.push('deadline is required.');
     else if (isNaN(Date.parse(deadline))) errors.push('deadline must be a valid date.');
-    if (!created_by?.trim())  errors.push('created_by (user id) is required.');
+    if (!created_by?.trim()) errors.push('created_by (user id) is required.');
 
     if (Array.isArray(items) && items.length > 0) {
       items.forEach((item, i) => {
@@ -170,18 +170,18 @@ export async function createRFQ(req: Request, res: Response): Promise<void> {
     const rfq = await prisma.rFQ.create({
       data: {
         reference_number,
-        title:       title!.trim(),
+        title: title!.trim(),
         description: description!.trim(),
-        deadline:    new Date(deadline!),
-        status:      parsedStatus,
-        created_by:  created_by!,
+        deadline: new Date(deadline!),
+        status: parsedStatus,
+        created_by: created_by!,
         items: {
           create: (items ?? []).map((item) => ({
             product_name: item.product_name!.trim(),
-            description:  item.description?.trim() ?? null,
-            quantity:     Number(item.quantity),
-            unit:         item.unit!.trim(),
-            unit_price:   item.unit_price != null ? item.unit_price : null,
+            description: item.description?.trim() ?? null,
+            quantity: Number(item.quantity),
+            unit: item.unit!.trim(),
+            unit_price: item.unit_price != null ? item.unit_price : null,
           })),
         },
         vendors: {
@@ -189,10 +189,10 @@ export async function createRFQ(req: Request, res: Response): Promise<void> {
         },
       },
       include: {
-        items:    true,
-        vendors:  { include: { vendor: { select: { id: true, name: true, category: true, status: true } } } },
-        creator:  { select: { id: true, name: true, email: true } },
-        _count:   { select: { attachments: true, quotations: true } },
+        items: true,
+        vendors: { include: { vendor: { select: { id: true, name: true, category: true, status: true } } } },
+        creator: { select: { id: true, name: true, email: true } },
+        _count: { select: { attachments: true, quotations: true } },
       },
     });
 
@@ -216,11 +216,11 @@ export async function getRFQ(req: Request, res: Response): Promise<void> {
     const rfq = await prisma.rFQ.findUnique({
       where: { id },
       include: {
-        items:       true,
+        items: true,
         attachments: true,
-        vendors:     { include: { vendor: { select: { id: true, name: true, category: true, gst_number: true, contact_email: true, status: true } } } },
-        creator:     { select: { id: true, name: true, email: true } },
-        _count:      { select: { quotations: true } },
+        vendors: { include: { vendor: { select: { id: true, name: true, category: true, gst_number: true, contact_email: true, status: true } } } },
+        creator: { select: { id: true, name: true, email: true } },
+        _count: { select: { quotations: true } },
       },
     });
 
@@ -255,9 +255,9 @@ export async function updateRFQ(req: Request, res: Response): Promise<void> {
     if (errors.length > 0) { res.status(400).json({ errors }); return; }
 
     const data: Record<string, unknown> = {};
-    if (title       !== undefined) data.title       = title.trim();
+    if (title !== undefined) data.title = title.trim();
     if (description !== undefined) data.description = description.trim();
-    if (deadline    !== undefined) data.deadline    = new Date(deadline);
+    if (deadline !== undefined) data.deadline = new Date(deadline);
 
     const updated = await prisma.rFQ.update({ where: { id }, data });
     res.json({ data: updated });
@@ -274,7 +274,7 @@ export async function updateRFQ(req: Request, res: Response): Promise<void> {
  */
 export async function updateRFQStatus(req: Request, res: Response): Promise<void> {
   try {
-    const id     = String(req.params['id']);
+    const id = String(req.params['id']);
     const { status } = req.body as { status?: string };
 
     if (!status) { res.status(400).json({ error: 'status is required.' }); return; }
@@ -310,7 +310,7 @@ export async function deleteRFQ(req: Request, res: Response): Promise<void> {
 
     const existing = await prisma.rFQ.findUnique({
       where: { id },
-      include: { rfqAttachments : { select: { path: true } } },
+      include: { rfqAttachments: { select: { path: true } } },
     });
     if (!existing) { res.status(404).json({ error: 'RFQ not found.' }); return; }
     if (existing.status !== 'DRAFT') {
@@ -318,7 +318,7 @@ export async function deleteRFQ(req: Request, res: Response): Promise<void> {
     }
 
     // Remove uploaded files from disk before DB delete
-    for (const att of existing.rfqAttachments ) {
+    for (const att of existing.rfqAttachments) {
       if (fs.existsSync(att.path)) fs.unlinkSync(att.path);
     }
 
@@ -356,12 +356,12 @@ export async function addItem(req: Request, res: Response): Promise<void> {
 
     const item = await prisma.rFQ_Item.create({
       data: {
-        rfq_id:       id,
+        rfq_id: id,
         product_name: product_name!.trim(),
-        description:  description?.trim() ?? null,
-        quantity:     Number(quantity),
-        unit:         unit!.trim(),
-        unit_price:   unit_price != null ? unit_price : null,
+        description: description?.trim() ?? null,
+        quantity: Number(quantity),
+        unit: unit!.trim(),
+        unit_price: unit_price != null ? unit_price : null,
       },
     });
 
@@ -377,7 +377,7 @@ export async function addItem(req: Request, res: Response): Promise<void> {
  */
 export async function updateItem(req: Request, res: Response): Promise<void> {
   try {
-    const rfqId  = String(req.params['id']);
+    const rfqId = String(req.params['id']);
     const itemId = String(req.params['itemId']);
     const { product_name, description, quantity, unit, unit_price } = req.body as {
       product_name?: string; description?: string;
@@ -393,10 +393,10 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
 
     const data: Record<string, unknown> = {};
     if (product_name !== undefined) data.product_name = product_name.trim();
-    if (description  !== undefined) data.description  = description.trim() || null;
-    if (quantity     !== undefined) data.quantity     = Number(quantity);
-    if (unit         !== undefined) data.unit         = unit.trim();
-    if (unit_price   !== undefined) data.unit_price   = unit_price;
+    if (description !== undefined) data.description = description.trim() || null;
+    if (quantity !== undefined) data.quantity = Number(quantity);
+    if (unit !== undefined) data.unit = unit.trim();
+    if (unit_price !== undefined) data.unit_price = unit_price;
 
     const updated = await prisma.rFQ_Item.update({ where: { id: itemId }, data });
     res.json({ data: updated });
@@ -411,7 +411,7 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
  */
 export async function deleteItem(req: Request, res: Response): Promise<void> {
   try {
-    const rfqId  = String(req.params['id']);
+    const rfqId = String(req.params['id']);
     const itemId = String(req.params['itemId']);
 
     const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { status: true } });
@@ -476,7 +476,7 @@ export async function assignVendors(req: Request, res: Response): Promise<void> 
  */
 export async function removeVendor(req: Request, res: Response): Promise<void> {
   try {
-    const rfqId    = String(req.params['id']);
+    const rfqId = String(req.params['id']);
     const vendorId = String(req.params['vendorId']);
 
     const rfq = await prisma.rFQ.findUnique({ where: { id: rfqId }, select: { status: true } });
@@ -520,12 +520,12 @@ export async function uploadAttachment(req: Request, res: Response): Promise<voi
 
     const attachment = await prisma.rFQ_Attachment.create({
       data: {
-        rfq_id:        rfqId,
-        filename:      req.file.filename,
+        rfq_id: rfqId,
+        filename: req.file.filename,
         original_name: req.file.originalname,
-        mime_type:     req.file.mimetype,
-        size_bytes:    req.file.size,
-        path:          req.file.path,
+        mime_type: req.file.mimetype,
+        size_bytes: req.file.size,
+        path: req.file.path,
       },
     });
 
@@ -542,7 +542,7 @@ export async function uploadAttachment(req: Request, res: Response): Promise<voi
  */
 export async function deleteAttachment(req: Request, res: Response): Promise<void> {
   try {
-    const rfqId        = String(req.params['id']);
+    const rfqId = String(req.params['id']);
     const attachmentId = String(req.params['attachmentId']);
 
     const attachment = await prisma.rFQ_Attachment.findFirst({

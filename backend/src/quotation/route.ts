@@ -9,8 +9,11 @@ import {
   deleteQuotation,
   listRFQQuotations,
 } from './controller';
+import { isAuthenticated } from '../middleware';
 
 const router = Router({ mergeParams: true }); // mergeParams for /rfqs/:rfqId/quotations
+
+router.use(isAuthenticated);
 
 // ── Quotation endpoints ───────────────────────────────────────────────────────
 // GET    /api/quotations                    → list with ?rfq_id, vendor_id, status

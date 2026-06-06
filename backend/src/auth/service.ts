@@ -1,9 +1,9 @@
 import crypto from "crypto";
 import fs from "fs/promises";
 import jwt from "jsonwebtoken";
-import prisma from "../lib/prisma";
+import prisma from "../utils/prisma";
 import { ACCESS_KEY, ACCESS_TOKEN_MAX_AGE_MS, REFRESH_KEY, REFRESH_TOKEN_MAX_AGE_MS, RESET_TOKEN_MAX_AGE_MS, S3_PUBLIC_BUCKET } from "../env_var";
-import { getS3PublicUrl, uploadFileToS3 } from "../utils/s3";
+import { uploadFileToS3, generateSignedUrl } from "../utils/s3";
 import { UserRole } from "../generated/prisma/enums";
 import type { SignupInput, LoginInput, ForgotPasswordInput, ResetPasswordInput } from "./zod_shcema";
 
@@ -65,7 +65,7 @@ function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-function buildUserPayload(user: {
+async function buildUserPayload(user: {
   id: string;
   first_name: string;
   last_name: string;
@@ -73,8 +73,13 @@ function buildUserPayload(user: {
   role: UserRole;
   phone?: string | null;
   country?: string | null;
-  image_url?: string | null;
-}): AuthUserPayload {
+  image_key?: string | null;
+}): Promise<AuthUserPayload> {
+  let signedUrl = null;
+  if (user.image_key) {
+    signedUrl = await generateSignedUrl(user.image_key, S3_PUBLIC_BUCKET || 'public');
+  }
+
   return {
     id: user.id,
     first_name: user.first_name,
@@ -84,7 +89,7 @@ function buildUserPayload(user: {
     role: user.role,
     phone: user.phone ?? null,
     country: user.country ?? null,
-    image_url: user.image_url ?? null,
+    image_url: signedUrl ?? null,
   };
 }
 
@@ -129,7 +134,7 @@ async function uploadProfileImage(filePath: string, mimeType: string): Promise<s
     throw new AuthError(500, "Unable to upload profile image");
   }
 
-  return getS3PublicUrl(uploaded.Key) ?? uploaded.Location ?? "";
+  return uploaded.Key;
 }
 
 async function createAuthSession(user: AuthUserPayload, sessionId: string, refreshMaxAgeMs = REFRESH_TOKEN_MAX_AGE_MS): Promise<AuthSessionPayload> {
@@ -158,7 +163,9 @@ export async function signupService(input: SignupInput, file?: Express.Multer.Fi
     throw new AuthError(409, "A user with this email already exists");
   }
 
-  const imageUrl = file?.path ? await uploadProfileImage(file.path, file.mimetype) : null;
+  const imageKey = file?.path ? await uploadProfileImage(file.path, file.mimetype) : null;
+
+  console.log(imageKey)
 
   try {
     const user = await prisma.user.create({
@@ -170,12 +177,12 @@ export async function signupService(input: SignupInput, file?: Express.Multer.Fi
         role: input.role,
         phone: input.phone?.trim() || null,
         country: input.country?.trim() || null,
-        image_url: imageUrl,
-        
+        image_key: imageKey,
+
       },
     });
 
-    return createAuthSession(buildUserPayload(user), crypto.randomUUID());
+    return createAuthSession(await buildUserPayload(user), crypto.randomUUID());
   } finally {
     if (file?.path) {
       await fs.unlink(file.path).catch(() => undefined);
@@ -196,7 +203,7 @@ export async function loginService(input: LoginInput): Promise<AuthSessionPayloa
     throw new AuthError(401, "Invalid email or password");
   }
 
-  return createAuthSession(buildUserPayload(user), crypto.randomUUID());
+  return createAuthSession(await buildUserPayload(user), crypto.randomUUID());
 }
 
 export async function rotateRefreshToken(refreshToken: string): Promise<AuthSessionPayload> {
@@ -250,7 +257,7 @@ export async function rotateRefreshToken(refreshToken: string): Promise<AuthSess
 
   const refreshExpiresAt = tokenRecord.expires_at;
   const remainingMs = Math.max(1, refreshExpiresAt.getTime() - Date.now());
-  const userPayload = buildUserPayload(user);
+  const userPayload = await buildUserPayload(user);
 
   const access_token = signAccessToken(userPayload);
   const refresh_token = signRefreshToken({ id: user.id, sessionId }, remainingMs);

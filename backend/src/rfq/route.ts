@@ -14,9 +14,12 @@ import {
   uploadAttachment,
   deleteAttachment,
 } from './controller';
-import { rfqUpload } from '../lib/upload';
+import { rfqUpload } from '../utils/upload';
+import { isAuthenticated } from '../middleware';
 
 const router = Router();
+
+router.use(isAuthenticated);
 
 // ── RFQ CRUD ──────────────────────────────────────────────────────────────────
 // GET    /api/rfqs                          → list with search / filter / sort

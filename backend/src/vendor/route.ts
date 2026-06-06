@@ -9,8 +9,11 @@ import {
   listVendors,
   updateVendor,
 } from './controller';
+import { isAuthenticated } from '../middleware';
 
 const router = Router();
+
+router.use(isAuthenticated);
 
 // ── Vendor CRUD ───────────────────────────────────────────────────────────────
 // GET    /api/vendors              → list with search / filter / sort / pagination

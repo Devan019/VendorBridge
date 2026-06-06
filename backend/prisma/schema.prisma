@@ -46,7 +46,7 @@ model User {
   role           UserRole
   phone          String?
   country        String?
-  image_url      String?
+  image_key      String?
   created_at     DateTime       @default(now())
   logs           ActivityLog[]
   approvals      Approval[]
