@@ -130,9 +130,8 @@ export const createQuotation = expressAsyncHandler(async (req: Request, res: Res
     return formatResponse(res, 409, "Conflict", false, null, `Quotations can only be submitted for SENT RFQs. Current status: ${rfq.status}.`);
   }
 
-  if (new Date() > new Date(rfq.deadline)) {
-    return formatResponse(res, 409, "Conflict", false, null, "The RFQ deadline has passed. Quotations are no longer accepted.");
-  }
+  // Deadline is informational — the RFQ status (SENT → CLOSED) controls acceptance.
+  // Procurement officers can close the RFQ manually when they stop accepting quotes.
 
   const assignment = await prisma.rFQ_Vendor.findUnique({
     where: { rfq_id_vendor_id: { rfq_id: rfq_id!, vendor_id: vendor_id! } },

@@ -1,25 +1,31 @@
 import { BASE_URL, refreshTokenRoute } from '@/constants/backend_routes';
 import axios from 'axios';
 
-import toast from 'react-hot-toast';
+// NOTE: react-hot-toast is NOT imported at the top level.
+// Turbopack/Next.js cannot instantiate its ESM module (.mjs) before the React
+// component tree is ready. We import it lazily inside callbacks instead.
+async function showErrorToast(message: string) {
+  try {
+    const { default: toast } = await import('react-hot-toast');
+    toast.error(message);
+  } catch {
+    // toast unavailable (e.g. during SSR) — fail silently
+  }
+}
 
 const axios_api = axios.create({
   baseURL: BASE_URL + '/api',
   withCredentials: true,
 });
 
-// Variables to track the race condition
+// Variables to track the refresh-token race condition
 let isRefreshing = false;
-let failedQueue: any[] = [];
+let failedQueue: { resolve: (v: any) => void; reject: (e: any) => void }[] = [];
 
-// Helper to resolve or reject the queued requests
 const processQueue = (error: any, token: null | boolean = null) => {
   failedQueue.forEach(prom => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
+    if (error) prom.reject(error);
+    else       prom.resolve(token);
   });
   failedQueue = [];
 };
@@ -28,60 +34,42 @@ axios_api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    //if get error in api and that is 401 and message is same do retry
+
+    // ── 401 handling: try to refresh the token ───────────────────────────
     if (error.response?.status === 401 && !originalRequest._retry) {
-      
-      // IF WE ARE ALREADY REFRESHING: Put this request in the waiting line!
+
       if (isRefreshing) {
-        return new Promise(function(resolve, reject) {
+        return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then(token => {
-          return axios_api(originalRequest); // Retry the request once the line moves
-        }).catch(err => {
-          return Promise.reject(err);
-        });
+        })
+          .then(() => axios_api(originalRequest))
+          .catch(err => Promise.reject(err));
       }
 
-      // IF WE ARE THE FIRST REQUEST TO FAIL: Lock the door and start refreshing!
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
-        //  call refresh endpoint
-        const data = await axios.post(refreshTokenRoute, {}, { withCredentials: true });
-
-        // Success! Release the queue so other requests are going to retry with the new token.
+        await axios.post(refreshTokenRoute, {}, { withCredentials: true });
         processQueue(null, true);
-        
-        // Retry Request 1
         return axios_api(originalRequest);
-        
       } catch (refreshError) {
-        // Refresh token is completely dead. Boot them out.
         processQueue(refreshError, null);
         return Promise.reject(refreshError);
-        
       } finally {
-        // Unlock the door
         isRefreshing = false;
       }
     }
 
-    // Global Error Toast Handler
-    // Only toast if it's NOT a 401 (which we handle) and it's not explicitly disabled
+    // ── Global error toast (non-401 errors) ──────────────────────────────
     if (error.response && error.response.status !== 401) {
-      const errorMessage = error.response.data?.ERROR || error.response.data?.MESSAGE || error.message || 'An unexpected error occurred';
-      
-      // If errorMessage is an array of strings (validation errors), join them or just show the first one
-      const displayMessage = Array.isArray(errorMessage) ? errorMessage[0] : errorMessage;
-      
-      toast.error(displayMessage);
+      const raw = error.response.data?.ERROR || error.response.data?.MESSAGE || error.message || 'An unexpected error occurred';
+      const displayMessage = Array.isArray(raw) ? raw[0] : raw;
+      showErrorToast(displayMessage);
     } else if (!error.response) {
-      // Network error or server down
-      toast.error('Network error. Please check your connection.');
+      showErrorToast('Network error. Please check your connection.');
     }
 
-    //back to error if it's not the specific error we are looking for
     return Promise.reject(error);
   }
 );
