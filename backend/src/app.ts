@@ -4,6 +4,7 @@ import cors from 'cors';
 import express, { Application, Request, Response } from 'express';
 import vendorRoutes from './routes/vendor.routes';
 import rfqRoutes from './routes/rfq.routes';
+import quotationRoutes, { listRFQQuotations } from './routes/quotation.routes';
 
 const app: Application = express();
 const PORT: number = Number(process.env.PORT) || 4000;
@@ -32,6 +33,9 @@ app.get('/', (_req: Request, res: Response) => {
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/rfqs', rfqRoutes);
+app.use('/api/quotations', quotationRoutes);
+// Nested: GET /api/rfqs/:rfqId/quotations
+app.get('/api/rfqs/:rfqId/quotations', listRFQQuotations);
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {

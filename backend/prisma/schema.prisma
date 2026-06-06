@@ -24,6 +24,13 @@ enum RFQStatus {
   CLOSED
 }
 
+enum QuotationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -124,21 +131,26 @@ model Quotation {
   rfq          RFQ              @relation(fields: [rfq_id], references: [id])
   vendor_id    String
   vendor       Vendor           @relation(fields: [vendor_id], references: [id])
-  status       String
+  status       QuotationStatus  @default(SUBMITTED)
+  notes        String?          // vendor-level notes / cover letter
   submitted_at DateTime         @default(now())
+  updated_at   DateTime         @updatedAt
   items        Quotation_Item[]
   approvals    Approval[]
   pos          PurchaseOrder[]
+
+  @@unique([rfq_id, vendor_id])  // one quotation per vendor per RFQ
 }
 
 model Quotation_Item {
   id            String    @id @default(uuid())
   quotation_id  String
-  quotation     Quotation @relation(fields: [quotation_id], references: [id])
+  quotation     Quotation @relation(fields: [quotation_id], references: [id], onDelete: Cascade)
   rfq_item_id   String
   rfq_item      RFQ_Item  @relation(fields: [rfq_item_id], references: [id])
   unit_price    Decimal
   delivery_days Int
+  notes         String?   // per-line notes from vendor
 }
 
 model Approval {
