@@ -5,14 +5,16 @@ export type Role = 'ADMIN' | 'MANAGER' | 'PROCUREMENT_OFFICER' | 'VENDOR';
 // Define which roles have access to which base routes
 export const RoutePermissions: Record<string, Role[]> = {
   [FrontendRoutes.DASHBOARD]: ['ADMIN', 'MANAGER', 'PROCUREMENT_OFFICER', 'VENDOR'],
-  [FrontendRoutes.VENDORS]: ['ADMIN'],
+  [FrontendRoutes.VENDORS]: ['ADMIN', 'PROCUREMENT_OFFICER'],
   [FrontendRoutes.RFQS]: ['ADMIN', 'MANAGER', 'PROCUREMENT_OFFICER', 'VENDOR'], // Note: specific actions inside RFQs will be checked, but list view is available to all
   [FrontendRoutes.QUOTATIONS]: ['ADMIN', 'PROCUREMENT_OFFICER', 'VENDOR'],
   [FrontendRoutes.APPROVALS]: ['ADMIN', 'MANAGER'],
-  [FrontendRoutes.PURCHASE_ORDERS]: ['ADMIN', 'PROCUREMENT_OFFICER', 'VENDOR'],
   [FrontendRoutes.INVOICES]: ['ADMIN', 'PROCUREMENT_OFFICER'],
   [FrontendRoutes.REPORTS]: ['ADMIN', 'MANAGER'],
   [FrontendRoutes.ACTIVITY]: ['ADMIN', 'MANAGER'],
+  [FrontendRoutes.ADMIN]: ['ADMIN'],
+  [FrontendRoutes.ADMIN_USERS]: ['ADMIN'],
+  [FrontendRoutes.ADMIN_ANALYTICS]: ['ADMIN'],
 };
 
 /**

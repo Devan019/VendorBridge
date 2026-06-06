@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '../ui/Button';
@@ -9,10 +10,12 @@ import { FrontendRoutes } from '@/constants/frontend_route';
 export function Navbar() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
   const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    router.push(FrontendRoutes.HOME);
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    await logout();
+    router.push(FrontendRoutes.LOGIN);
   };
 
   if (isLoading) {
@@ -54,15 +57,22 @@ export function Navbar() {
                       {user?.first_name?.charAt(0)}{user?.last_name?.charAt(0)}
                     </div>
                   )}
-                  <span className="text-sm font-medium text-foreground">
-                    {user?.first_name} {user?.last_name}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground leading-tight">
+                      {user?.first_name} {user?.last_name}
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground leading-tight">
+                      {user?.role === 'PROCUREMENT_OFFICER' ? 'Officer' :
+                       user?.role === 'ADMIN' ? 'Admin' :
+                       user?.role === 'MANAGER' ? 'Manager' : 'Vendor'}
+                    </span>
+                  </div>
                 </div>
                 <Link href={FrontendRoutes.DASHBOARD}>
                   <Button variant="ghost" size="sm">Dashboard</Button>
                 </Link>
-                <Button variant="outline" size="sm" onClick={handleLogout}>
-                  Log out
+                <Button variant="outline" size="sm" onClick={handleLogout} disabled={isLoggingOut}>
+                  {isLoggingOut ? 'Logging out...' : 'Log out'}
                 </Button>
               </>
             ) : (

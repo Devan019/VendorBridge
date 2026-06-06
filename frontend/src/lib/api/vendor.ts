@@ -68,5 +68,10 @@ export const vendorApi = {
   addVendorNote: async (id: string, note: string) => {
     const res = await axios_api.post(`/vendors/${id}/notes`, { content: note });
     return res.data.DATA || res.data;
+  },
+
+  getMyVendor: async () => {
+    const res = await axios_api.get('/vendors/me');
+    return res.data.DATA || res.data;
   }
 };

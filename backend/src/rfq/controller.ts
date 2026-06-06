@@ -76,6 +76,21 @@ export const listRFQs = expressAsyncHandler(async (req: Request, res: Response) 
   }
   if (created_by) where.created_by = created_by;
 
+  if (req.user?.role === 'VENDOR') {
+    // Only show RFQs assigned to this vendor, matching by their logged-in email
+    where.vendors = {
+      some: {
+        vendor: {
+          contact_email: { equals: req.user.email, mode: 'insensitive' }
+        }
+      }
+    };
+    // Vendors shouldn't see DRAFT RFQs unless we specifically allow it, but let's restrict to SENT/CLOSED
+    if (!where.status) {
+      where.status = { in: ['SENT', 'CLOSED'] };
+    }
+  }
+
   const [rfqs, total] = await Promise.all([
     prisma.rFQ.findMany({
       where,

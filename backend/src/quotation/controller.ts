@@ -53,11 +53,20 @@ export const listQuotations = expressAsyncHandler(async (req: Request, res: Resp
 
   const where: Record<string, unknown> = {};
   if (rfq_id) where.rfq_id = rfq_id;
-  if (vendor_id) where.vendor_id = vendor_id;
+
+  if (req.user?.role === 'VENDOR') {
+    where.vendor = {
+      contact_email: { equals: req.user.email, mode: 'insensitive' }
+    };
+  } else if (vendor_id) {
+    where.vendor_id = vendor_id;
+  }
+
   if (status) {
     const parsed = parseStatus(status);
     if (parsed) where.status = parsed;
   }
+
 
   const [quotations, total] = await Promise.all([
     prisma.quotation.findMany({

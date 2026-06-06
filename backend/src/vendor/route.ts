@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  getMyVendor,
   addVendorNote,
   createVendor,
   deleteVendor,
@@ -9,7 +10,7 @@ import {
   listVendors,
   updateVendor,
 } from './controller';
-import { isAuthenticated } from '../middleware';
+import { isAuthenticated, isAuthorized } from '../middleware';
 
 const router = Router();
 
@@ -28,14 +29,15 @@ router.use(isAuthenticated);
 // POST   /api/vendors/:id/notes    → add a note to vendor profile
 
 router.get('/', listVendors);
-router.post('/', createVendor);
+router.post('/', isAuthorized(['ADMIN', 'PROCUREMENT_OFFICER']), createVendor);
 
-// Static sub-path must come BEFORE the dynamic :id routes
+// Static sub-paths BEFORE dynamic :id
 router.get('/categories', listCategories);
+router.get('/me', getMyVendor); // vendor finds their own profile by email
 
 router.get('/:id', getVendor);
-router.patch('/:id', updateVendor);
-router.delete('/:id', deleteVendor);
+router.patch('/:id', isAuthorized(['ADMIN', 'PROCUREMENT_OFFICER']), updateVendor);
+router.delete('/:id', isAuthorized(['ADMIN']), deleteVendor);
 
 router.get('/:id/history', getVendorHistory);
 router.post('/:id/notes', addVendorNote);

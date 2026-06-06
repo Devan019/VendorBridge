@@ -9,7 +9,7 @@ import {
   deleteQuotation,
   listRFQQuotations,
 } from './controller';
-import { isAuthenticated } from '../middleware';
+import { isAuthenticated, isAuthorized } from '../middleware';
 
 const router = Router({ mergeParams: true }); // mergeParams for /rfqs/:rfqId/quotations
 
@@ -28,13 +28,13 @@ router.use(isAuthenticated);
 // GET    /api/rfqs/:rfqId/quotations        → all quotations for an RFQ
 
 router.get('/', listQuotations);
-router.post('/', createQuotation);
+router.post('/', isAuthorized(['VENDOR']), createQuotation);
 
 router.get('/:id', getQuotation);
-router.patch('/:id', updateQuotation);
-router.post('/:id/submit', confirmSubmission);
-router.patch('/:id/status', updateQuotationStatus);
-router.delete('/:id', deleteQuotation);
+router.patch('/:id', isAuthorized(['VENDOR']), updateQuotation);
+router.post('/:id/submit', isAuthorized(['VENDOR']), confirmSubmission);
+router.patch('/:id/status', isAuthorized(['ADMIN', 'PROCUREMENT_OFFICER', 'MANAGER']), updateQuotationStatus);
+router.delete('/:id', isAuthorized(['VENDOR']), deleteQuotation);
 
 // Nested route (used when mounted under /api/rfqs/:rfqId)
 router.get('/rfq/:rfqId', listRFQQuotations);

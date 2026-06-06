@@ -14,4 +14,7 @@ export const FrontendRoutes = {
     INVOICES: "/dashboard/invoices",
     REPORTS: "/dashboard/reports",
     ACTIVITY: "/dashboard/activity",
+    ADMIN: "/dashboard/admin",
+    ADMIN_USERS: "/dashboard/admin/users",
+    ADMIN_ANALYTICS: "/dashboard/admin/analytics",
 }

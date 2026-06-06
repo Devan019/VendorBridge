@@ -29,6 +29,22 @@ function qs(val: unknown, fallback = ''): string {
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
 
+// GET /api/vendors/me — returns the Vendor record whose contact_email matches the logged-in user
+export const getMyVendor = expressAsyncHandler(async (req: Request, res: Response) => {
+  const email = req.user?.email;
+  if (!email) return formatResponse(res, 401, 'Unauthorized', false, null);
+
+  const vendor = await prisma.vendor.findFirst({
+    where: { contact_email: { equals: email, mode: 'insensitive' } },
+  });
+
+  if (!vendor) {
+    return formatResponse(res, 404, 'Not Found', false, null, 'No vendor profile linked to your account.');
+  }
+
+  return formatResponse(res, 200, 'Vendor fetched', true, { data: vendor });
+});
+
 export const listVendors = expressAsyncHandler(async (req: Request, res: Response) => {
   const search = qs(req.query.search);
   const status = qs(req.query.status);
