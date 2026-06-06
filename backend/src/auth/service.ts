@@ -69,6 +69,7 @@ function buildUserPayload(user: {
   id: string;
   first_name: string;
   last_name: string;
+  name: string;
   email: string;
   role: UserRole;
   phone?: string | null;
@@ -79,7 +80,7 @@ function buildUserPayload(user: {
     id: user.id,
     first_name: user.first_name,
     last_name: user.last_name,
-    name: `${user.first_name} ${user.last_name}`.trim(),
+    name: user.name || `${user.first_name} ${user.last_name}`.trim(),
     email: user.email,
     role: user.role,
     phone: user.phone ?? null,
@@ -161,17 +162,18 @@ export async function signupService(input: SignupInput, file?: Express.Multer.Fi
   const imageUrl = file?.path ? await uploadProfileImage(file.path, file.mimetype) : null;
 
   try {
+    const name = `${input.first_name.trim()} ${input.last_name.trim()}`.trim();
     const user = await prisma.user.create({
       data: {
         first_name: input.first_name.trim(),
         last_name: input.last_name.trim(),
+        name,
         email: input.email.toLowerCase().trim(),
         password_hash: hashPassword(input.password),
         role: input.role,
         phone: input.phone?.trim() || null,
         country: input.country?.trim() || null,
         image_url: imageUrl,
-        
       },
     });
 

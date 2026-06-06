@@ -88,7 +88,7 @@ export async function listRFQs(req: Request, res: Response): Promise<void> {
           id: true, reference_number: true, title: true, description: true,
           deadline: true, status: true, created_at: true, updated_at: true,
           creator: { select: { id: true, name: true, email: true } },
-          _count: { select: { items: true, vendors: true, attachments: true, quotations: true } },
+          _count: { select: { items: true, vendors: true, rfqAttachments: true, quotations: true } },
         },
       }),
       prisma.rFQ.count({ where }),
@@ -192,7 +192,7 @@ export async function createRFQ(req: Request, res: Response): Promise<void> {
         items:    true,
         vendors:  { include: { vendor: { select: { id: true, name: true, category: true, status: true } } } },
         creator:  { select: { id: true, name: true, email: true } },
-        _count:   { select: { attachments: true, quotations: true } },
+        _count:   { select: { rfqAttachments: true, quotations: true } },
       },
     });
 
@@ -217,7 +217,7 @@ export async function getRFQ(req: Request, res: Response): Promise<void> {
       where: { id },
       include: {
         items:       true,
-        attachments: true,
+        rfqAttachments: true,
         vendors:     { include: { vendor: { select: { id: true, name: true, category: true, gst_number: true, contact_email: true, status: true } } } },
         creator:     { select: { id: true, name: true, email: true } },
         _count:      { select: { quotations: true } },
@@ -310,7 +310,7 @@ export async function deleteRFQ(req: Request, res: Response): Promise<void> {
 
     const existing = await prisma.rFQ.findUnique({
       where: { id },
-      include: { rfqAttachments : { select: { path: true } } },
+      include: { rfqAttachments: { select: { path: true } } },
     });
     if (!existing) { res.status(404).json({ error: 'RFQ not found.' }); return; }
     if (existing.status !== 'DRAFT') {
@@ -318,7 +318,7 @@ export async function deleteRFQ(req: Request, res: Response): Promise<void> {
     }
 
     // Remove uploaded files from disk before DB delete
-    for (const att of existing.rfqAttachments ) {
+    for (const att of existing.rfqAttachments) {
       if (fs.existsSync(att.path)) fs.unlinkSync(att.path);
     }
 
